@@ -5,6 +5,10 @@
   let categories = [];
   let showAddForm = false;
   let editingQuestion = null;
+  let isAuthenticated = false;
+  let passwordInput = '';
+
+  const ADMIN_PASSWORD = 'ozbilig23';
 
   let newQuestion = {
     question_text: '',
@@ -13,9 +17,19 @@
     difficulty: 'medium'
   };
 
+  function checkPassword() {
+    if (passwordInput === ADMIN_PASSWORD) {
+      isAuthenticated = true;
+      loadQuestions();
+      loadCategories();
+    } else {
+      alert('Yanlış şifre!');
+      passwordInput = '';
+    }
+  }
+
   onMount(async () => {
-    await loadQuestions();
-    await loadCategories();
+    // Don't load until authenticated
   });
 
   async function loadQuestions() {
@@ -94,14 +108,52 @@
 </script>
 
 <div class="min-h-screen bg-gradient-to-br from-cyan-100 to-lime-100 p-6">
-  <div class="max-w-6xl mx-auto">
-    <div class="bg-white rounded-2xl shadow-2xl p-8 mb-6">
-      <div class="flex justify-between items-center mb-6">
-        <h1 class="text-4xl font-bold text-primary">ÖzBilig Admin Paneli</h1>
-        <a href="/#" class="btn btn-secondary">
-          Oyuna Dön
-        </a>
+  {#if !isAuthenticated}
+    <!-- Login Screen -->
+    <div class="max-w-md mx-auto mt-20">
+      <div class="bg-white rounded-2xl shadow-2xl p-8">
+        <h1 class="text-3xl font-bold text-primary text-center mb-6">ÖzBilig Admin Paneli</h1>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              Şifre
+            </label>
+            <input
+              type="password"
+              bind:value={passwordInput}
+              on:keypress={(e) => e.key === 'Enter' && checkPassword()}
+              placeholder="Admin şifresini girin"
+              class="input"
+              autofocus
+            />
+          </div>
+
+          <button
+            on:click={checkPassword}
+            class="btn btn-primary w-full"
+          >
+            Giriş Yap
+          </button>
+        </div>
+
+        <div class="mt-6 text-center">
+          <a href="/#" class="text-cyan-600 hover:text-cyan-700 font-semibold">
+            ← Oyuna Dön
+          </a>
+        </div>
       </div>
+    </div>
+  {:else}
+    <!-- Admin Panel -->
+    <div class="max-w-6xl mx-auto">
+      <div class="bg-white rounded-2xl shadow-2xl p-8 mb-6">
+        <div class="flex justify-between items-center mb-6">
+          <h1 class="text-4xl font-bold text-primary">ÖzBilig Admin Paneli</h1>
+          <a href="/#" class="btn btn-secondary">
+            Oyuna Dön
+          </a>
+        </div>
 
       <div class="grid grid-cols-3 gap-4 mb-6">
         <div class="bg-cyan-50 p-4 rounded-lg border-2 border-cyan-200">
@@ -245,6 +297,7 @@
       {/if}
     </div>
   </div>
+  {/if}
 </div>
 
 <style>
