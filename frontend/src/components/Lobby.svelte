@@ -27,10 +27,10 @@
     <div class="grid grid-cols-2 gap-3">
       {#each $gameState.players as player}
         <div class="bg-gradient-to-r from-cyan-50 to-lime-50 p-4 rounded-lg border-2 {player.is_host ? 'border-lime-400' : 'border-cyan-200'}">
-          <div class="flex items-center justify-between">
-            <span class="font-semibold text-gray-800">{player.name}</span>
+          <div class="text-center">
+            <div class="font-semibold text-gray-800">{player.name}</div>
             {#if player.is_host}
-              <span class="bg-lime-400 text-lime-900 text-xs px-2 py-1 rounded-full font-bold">
+              <span class="bg-lime-400 text-lime-900 text-xs px-2 py-1 rounded-full font-bold inline-block mt-2">
                 OYUN YÖNETİCİSİ
               </span>
             {/if}
