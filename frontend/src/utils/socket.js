@@ -10,7 +10,11 @@ class SocketManager {
     if (this.socket) return this.socket;
 
     // Socket.IO balant1s1
-    this.socket = io('http://localhost:8000', {
+    // Production'da window.location.origin kullanarak doğru URL'yi al
+    const socketUrl = window.location.origin;
+
+    this.socket = io(socketUrl, {
+      path: '/socket.io',
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1000,
