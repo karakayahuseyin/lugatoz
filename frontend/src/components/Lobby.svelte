@@ -1,9 +1,16 @@
 <script>
   import { gameState } from '../stores/gameStore';
   import { socketManager } from '../utils/socket';
+  import HowToPlay from './HowToPlay.svelte';
+
+  let showHowToPlay = false;
 
   function startGame() {
     socketManager.emit('start_game', {});
+  }
+
+  function toggleHowToPlay() {
+    showHowToPlay = !showHowToPlay;
   }
 </script>
 
@@ -55,7 +62,16 @@
   {/if}
 
   <div class="mt-6 pt-6 border-t border-gray-200">
-    <h4 class="font-semibold text-gray-700 mb-2">Oyun Kuralları:</h4>
+    <div class="flex justify-between items-center mb-3">
+      <h4 class="font-semibold text-gray-700">Oyun Kuralları:</h4>
+      <button
+        on:click={toggleHowToPlay}
+        class="text-cyan-600 hover:text-cyan-700 font-semibold text-sm flex items-center gap-1"
+      >
+        <span>📖</span>
+        Nasıl Oynanır?
+      </button>
+    </div>
     <ul class="text-sm text-gray-600 space-y-2">
       <li>• Her turda 10 soru bulunmaktadır</li>
       <li>• Her oyuncunun doğru cevaptan farklı bir seçenek yazması gerekir</li>
@@ -67,3 +83,7 @@
     </ul>
   </div>
 </div>
+
+{#if showHowToPlay}
+  <HowToPlay onClose={toggleHowToPlay} />
+{/if}
