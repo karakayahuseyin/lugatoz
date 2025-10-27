@@ -31,8 +31,8 @@ docker compose -f docker-compose.prod.yml ps
 # IP adresini göster
 IP=$(hostname -I | awk '{print $1}')
 echo -e "\n${GREEN}📡 Erişim Bilgileri:${NC}"
-echo -e "   🎮 Oyun: http://${IP}"
-echo -e "   🔧 Admin: http://${IP}/#admin"
+echo -e "   🎮 Oyun: http://${IP}:8080"
+echo -e "   🔧 Admin: http://${IP}:8080/#admin"
 echo -e "   📊 Backend API: http://${IP}:8000"
 echo -e "\n${YELLOW}💡 Multiplayer test için farklı cihazlardan yukarıdaki IP'ye bağlanın!${NC}\n"
 
