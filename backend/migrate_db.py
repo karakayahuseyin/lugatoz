@@ -6,7 +6,7 @@ Database migration script to add acceptable_answers column to questions table
 import sqlite3
 import os
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'ozbilig.db')
+DB_PATH = os.path.join(os.path.dirname(__file__), 'data', 'ozbilig.db')
 
 def migrate():
     """Add acceptable_answers column if it doesn't exist"""
