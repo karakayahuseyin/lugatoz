@@ -1,8 +1,10 @@
 <script>
   import { gameState, updateGameState } from '../stores/gameStore';
   import { notifications } from '../stores/notificationStore';
+  import HowToPlay from './HowToPlay.svelte';
 
   let playerName = '';
+  let showHowToPlay = false;
   export let onNameSubmit = (name) => {};
 
   function submitName() {
@@ -12,6 +14,10 @@
     }
 
     onNameSubmit(playerName.trim());
+  }
+
+  function toggleHowToPlay() {
+    showHowToPlay = !showHowToPlay;
   }
 </script>
 
@@ -51,13 +57,17 @@
     Devam Et
   </button>
 
-  <div class="mt-8 pt-6 border-t border-gray-200">
-    <h3 class="font-semibold text-gray-800 mb-2">Nasıl Oynanır?</h3>
-    <ul class="text-sm text-gray-600 space-y-1">
-      <li>1. Soru gösterilir</li>
-      <li>2. Herkes yanlış bir cevap ekler</li>
-      <li>3. Tüm şıklar arasından doğruyu bul</li>
-      <li>4. 10 soru sonunda final testi!</li>
-    </ul>
+  <div class="mt-6 text-center">
+    <button
+      on:click={toggleHowToPlay}
+      class="text-cyan-600 hover:text-cyan-700 font-semibold text-sm inline-flex items-center gap-1"
+    >
+      <span>📖</span>
+      Nasıl Oynanır?
+    </button>
   </div>
 </div>
+
+{#if showHowToPlay}
+  <HowToPlay onClose={toggleHowToPlay} />
+{/if}

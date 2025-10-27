@@ -61,26 +61,14 @@
     </div>
   {/if}
 
-  <div class="mt-6 pt-6 border-t border-gray-200">
-    <div class="flex justify-between items-center mb-3">
-      <h4 class="font-semibold text-gray-700">Oyun Kuralları:</h4>
-      <button
-        on:click={toggleHowToPlay}
-        class="text-cyan-600 hover:text-cyan-700 font-semibold text-sm flex items-center gap-1"
-      >
-        <span>📖</span>
-        Nasıl Oynanır?
-      </button>
-    </div>
-    <ul class="text-sm text-gray-600 space-y-2">
-      <li>• Her turda 10 soru bulunmaktadır</li>
-      <li>• Her oyuncunun doğru cevaptan farklı bir seçenek yazması gerekir</li>
-      <li>• <strong>Amaç:</strong> Doğru cevabı bulmak ve rakibi yanıltmak</li>
-      <li>• Doğru cevap: <strong>+1000 puan</strong></li>
-      <li>• Başkaları sizin yanlış cevabınızı seçerse: Her biri için <strong>+500 puan</strong></li>
-      <li>• Süresi içerisinde seçenek eklemez veya cevap vermezseniz <strong>-100 puan</strong> kaybedersiniz</li>
-      <li>• 10 soruluk tur bitiminde final testi var!</li>
-    </ul>
+  <div class="mt-6 pt-6 border-t border-gray-200 text-center">
+    <button
+      on:click={toggleHowToPlay}
+      class="text-cyan-600 hover:text-cyan-700 font-semibold text-sm inline-flex items-center gap-1"
+    >
+      <span>📖</span>
+      Nasıl Oynanır?
+    </button>
   </div>
 </div>
 

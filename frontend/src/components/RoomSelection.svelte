@@ -1,12 +1,14 @@
 <script>
   import { onMount } from 'svelte';
   import { updateGameState } from '../stores/gameStore';
+  import HowToPlay from './HowToPlay.svelte';
 
   export let playerName = '';
   export let onRoomSelect = (roomCode) => {};
 
   let rooms = [];
   let loading = true;
+  let showHowToPlay = false;
 
   onMount(async () => {
     await loadRooms();
@@ -25,6 +27,10 @@
 
   function selectRoom(roomCode) {
     onRoomSelect(roomCode);
+  }
+
+  function toggleHowToPlay() {
+    showHowToPlay = !showHowToPlay;
   }
 </script>
 
@@ -83,12 +89,23 @@
     </div>
   {/if}
 
-  <div class="mt-6 text-center">
+  <div class="mt-6 flex justify-center gap-6">
     <button
       on:click={() => window.location.reload()}
       class="text-cyan-600 hover:text-cyan-700 font-semibold text-sm"
     >
       ← Geri Dön
     </button>
+    <button
+      on:click={toggleHowToPlay}
+      class="text-cyan-600 hover:text-cyan-700 font-semibold text-sm inline-flex items-center gap-1"
+    >
+      <span>📖</span>
+      Nasıl Oynanır?
+    </button>
   </div>
 </div>
+
+{#if showHowToPlay}
+  <HowToPlay onClose={toggleHowToPlay} />
+{/if}
