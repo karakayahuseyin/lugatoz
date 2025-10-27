@@ -46,7 +46,7 @@
   // Listen for error from backend
   socketManager.on('answer_rejected', (data) => {
     if (data.reason === 'correct_answer') {
-      notifications.error('Doğru cevabı giremezsiniz! Yanlış ama inandırıcı bir cevap girmelisiniz.');
+      // Sadece cevabı temizle, uyarı gösterme
       fakeAnswer = '';
     } else if (data.reason === 'duplicate_answer') {
       notifications.warning('Bu cevap zaten başka bir oyuncu tarafından girildi! Farklı bir cevap deneyin.');
