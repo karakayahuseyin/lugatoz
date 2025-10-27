@@ -38,7 +38,7 @@
 
       <!-- Step 2 -->
       <div class="flex gap-6 items-start">
-        <div class="flex-shrink-0 w-16 h-16 bg-lime-500 text-white rounded-full flex items-center justify-center text-2xl font-bold">
+        <div class="flex-shrink-0 w-16 h-16 bg-yellow-500 text-white rounded-full flex items-center justify-center text-2xl font-bold">
           2
         </div>
         <div class="flex-1">
@@ -68,7 +68,7 @@
 
       <!-- Step 3 -->
       <div class="flex gap-6 items-start">
-        <div class="flex-shrink-0 w-16 h-16 bg-cyan-500 text-white rounded-full flex items-center justify-center text-2xl font-bold">
+        <div class="flex-shrink-0 w-16 h-16 bg-blue-500 text-white rounded-full flex items-center justify-center text-2xl font-bold">
           3
         </div>
         <div class="flex-1">
@@ -98,7 +98,7 @@
 
       <!-- Step 4 -->
       <div class="flex gap-6 items-start">
-        <div class="flex-shrink-0 w-16 h-16 bg-lime-500 text-white rounded-full flex items-center justify-center text-2xl font-bold">
+        <div class="flex-shrink-0 w-16 h-16 bg-green-500 text-white rounded-full flex items-center justify-center text-2xl font-bold">
           4
         </div>
         <div class="flex-1">
