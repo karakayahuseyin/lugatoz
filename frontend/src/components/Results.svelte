@@ -11,11 +11,14 @@
   }
 
   function handleTimeout() {
-    // Auto proceed if host
+    // Auto proceed for everyone (host will send the event)
     if ($gameState.isHost) {
       nextRound();
     }
   }
+
+  // Auto proceed when timer finishes, regardless of host button click
+  // Timer is shared for all players
 </script>
 
 <div class="card max-w-4xl w-full">
@@ -107,18 +110,12 @@
     </div>
   </div>
 
-  {#if $gameState.isHost}
-    <button
-      on:click={nextRound}
-      class="btn btn-primary w-full text-xl py-4"
-    >
-      {$gameState.currentRound + 1 >= $gameState.maxRounds ? 'Final Testine Geç' : 'Sonraki Soru'}
-    </button>
-  {:else}
-    <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 text-center">
-      <p class="text-blue-800 font-semibold">
-        Host bir sonraki soruya geçmesini bekleyin...
-      </p>
-    </div>
-  {/if}
+  <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 text-center">
+    <p class="text-blue-800 font-semibold">
+      {$gameState.currentRound + 1 >= $gameState.maxRounds ? 'Final testine geçiliyor...' : 'Sonraki soruya geçiliyor...'}
+    </p>
+    <p class="text-blue-600 text-sm mt-2">
+      10 saniye içinde otomatik olarak devam edilecek
+    </p>
+  </div>
 </div>

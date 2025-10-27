@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import socketio
+import asyncio
 from .game_manager import game_manager, GamePhase, check_answer
 from .database import SessionLocal
 from .models import Question
@@ -230,6 +231,47 @@ async def handle_submit_vote(sid, data):
             results['player_votes'].append(vote_info)
 
         await sio.emit('round_results', results, room=room.room_code)
+
+        # Auto-advance to next round after 10 seconds
+        asyncio.create_task(auto_next_round(room.room_code, room.current_round))
+
+
+async def auto_next_round(room_code, round_number):
+    """Automatically advance to next round after delay"""
+    await asyncio.sleep(10)  # Wait 10 seconds
+
+    room = game_manager.get_room()
+
+    # Check if we're still on the same round (in case someone manually advanced)
+    if room.current_round != round_number or room.phase != GamePhase.SHOWING_RESULTS:
+        return
+
+    # Advance to next round
+    room.next_round()
+
+    if room.phase == GamePhase.FINAL_TEST:
+        # Move to final test
+        await sio.emit('final_test_phase', {
+            'questions': [
+                {
+                    'index': i,
+                    'question_text': q['question_text'],
+                    'category': q.get('category', '')
+                }
+                for i, q in enumerate(room.questions)
+            ]
+        }, room=room_code)
+    else:
+        # New round
+        current_round = room.rounds[room.current_round]
+        await sio.emit('new_round', {
+            'room_state': room.to_dict(),
+            'question': {
+                'round': room.current_round + 1,
+                'total_rounds': room.max_rounds,
+                'text': current_round.question_text
+            }
+        }, room=room_code)
 
 
 @sio.on('next_round')
