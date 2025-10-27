@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin - ÖzBilig</title>
+    <script type="module">
+      import Admin from './src/components/Admin.svelte';
+      import './src/app.css';
+
+      new Admin({
+        target: document.getElementById('app')
+      });
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>

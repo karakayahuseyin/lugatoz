@@ -1,0 +1,36 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ozbilig-backend-prod
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend-db:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ENVIRONMENT=production
+    restart: always
+    networks:
+      - ozbilig-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: ozbilig-frontend-prod
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - ozbilig-network
+
+volumes:
+  backend-db:
+
+networks:
+  ozbilig-network:
+    driver: bridge
