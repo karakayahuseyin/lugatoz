@@ -371,21 +371,53 @@ class GameRoom:
 
 
 class GameManager:
-    """Manager for single fixed game room"""
+    """Manager for multiple fixed game rooms"""
 
-    FIXED_ROOM_CODE = "OZBILIG"
+    # 8 fixed rooms with scientist names
+    FIXED_ROOMS = [
+        {"code": "ALI_KUSCU", "name": "Ali Kuşçu", "description": "Şerhu'r-risâletil-vazi'yye (Arapça dil felsefesi ve mantık bilimleri üzerine önemli bir şerh)"},
+        {"code": "KARAMANOGLU", "name": "Karamanoğlu Mehmed Bey", "description": "Ferman (1277'de Türkçeyi resmî devlet dili ilan eden tarihî ferman)"},
+        {"code": "KASGARLI", "name": "Kâşgarlı Mahmud", "description": "Dîvânu Lugâti't-Türk (Türk dillerinin ilk sözlüğü ve ansiklopedik eseri)"},
+        {"code": "YUSUF_HACIB", "name": "Yusuf Has Hâcib", "description": "Kutadgu Bilig (Türkçe yazılmış ilk siyasetname ve didaktik eser)"},
+        {"code": "YUKNEKI", "name": "Edib Ahmed Yüknekî", "description": "Atebetü'l-Hakayık (Ahlak ve öğüt içerikli didaktik eser)"},
+        {"code": "YUNUS_EMRE", "name": "Yunus Emre", "description": "Dîvân (Anadolu'da halk diliyle yazılan tasavvuf şiirlerinin zirvesi)"},
+        {"code": "YESEVI", "name": "Hoca Ahmed Yesevî", "description": "Dîvân-ı Hikmet (Türk tasavvuf edebiyatının temel eserlerinden)"},
+        {"code": "NEVAYI", "name": "Ali Şîr Nevâyî", "description": "Muhâkemetü'l-Lügateyn (Türkçenin Farsçadan üstünlüğünü savunan karşılaştırmalı dil eseri)"},
+    ]
 
     def __init__(self):
-        # Create single fixed room
-        self.room = GameRoom(self.FIXED_ROOM_CODE, max_players=4)
+        # Create 8 fixed rooms
+        self.rooms: Dict[str, GameRoom] = {}
+        for room_info in self.FIXED_ROOMS:
+            self.rooms[room_info["code"]] = GameRoom(room_info["code"], max_players=4)
 
-    def get_room(self) -> GameRoom:
-        """Get the fixed room"""
-        return self.room
+    def get_room(self, room_code: str = None) -> GameRoom:
+        """Get a specific room by code, or the first room if not specified"""
+        if room_code is None:
+            # Return first room for backwards compatibility
+            return list(self.rooms.values())[0]
+        return self.rooms.get(room_code)
 
-    def reset_room(self):
-        """Reset room for new game"""
-        self.room = GameRoom(self.FIXED_ROOM_CODE, max_players=4)
+    def get_all_rooms(self) -> List[Dict]:
+        """Get all rooms with their status"""
+        rooms_status = []
+        for room_info in self.FIXED_ROOMS:
+            room = self.rooms[room_info["code"]]
+            rooms_status.append({
+                "code": room_info["code"],
+                "name": room_info["name"],
+                "description": room_info["description"],
+                "players": len(room.players),
+                "max_players": room.max_players,
+                "phase": room.phase.value,
+                "available": len(room.players) < room.max_players and room.phase == GamePhase.WAITING
+            })
+        return rooms_status
+
+    def reset_room(self, room_code: str):
+        """Reset a specific room for new game"""
+        if room_code in self.rooms:
+            self.rooms[room_code] = GameRoom(room_code, max_players=4)
 
 
 # Global game manager instance

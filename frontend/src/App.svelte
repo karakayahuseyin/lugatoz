@@ -5,6 +5,7 @@
   import { notifications } from './stores/notificationStore';
 
   import Home from './components/Home.svelte';
+  import RoomSelection from './components/RoomSelection.svelte';
   import Lobby from './components/Lobby.svelte';
   import SubmitFake from './components/SubmitFake.svelte';
   import Voting from './components/Voting.svelte';
@@ -16,6 +17,8 @@
 
   let socket;
   let currentRoute = 'game'; // 'game' or 'admin'
+  let playerName = '';
+  let showRoomSelection = false;
 
   function checkRoute() {
     const hash = window.location.hash;
@@ -127,6 +130,20 @@
       socketManager.disconnect();
     }
   });
+
+  function handleNameSubmit(name) {
+    playerName = name;
+    updateGameState({ playerName: name });
+    showRoomSelection = true;
+  }
+
+  function handleRoomSelect(roomCode) {
+    socketManager.emit('join_game', {
+      player_name: playerName,
+      room_code: roomCode
+    });
+    showRoomSelection = false;
+  }
 </script>
 
 <main>
@@ -138,8 +155,10 @@
 
   {#if currentRoute === 'admin'}
     <Admin />
+  {:else if showRoomSelection}
+    <RoomSelection playerName={playerName} onRoomSelect={handleRoomSelect} />
   {:else if $gameState.phase === 'home'}
-    <Home />
+    <Home onNameSubmit={handleNameSubmit} />
   {:else if $gameState.phase === 'lobby'}
     <Lobby />
   {:else if $gameState.phase === 'submitting_fake'}

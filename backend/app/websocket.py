@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import socketio
 import asyncio
+from typing import Dict
 from .game_manager import game_manager, GamePhase, check_answer
 from .database import SessionLocal
 from .models import Question
@@ -12,6 +13,17 @@ sio = socketio.AsyncServer(
     logger=True,
     engineio_logger=True
 )
+
+# Track which room each socket is in
+socket_rooms: Dict[str, str] = {}  # socket_id -> room_code
+
+
+def get_player_room(sid):
+    """Get the room for a given socket ID"""
+    room_code = socket_rooms.get(sid)
+    if room_code:
+        return game_manager.get_room(room_code)
+    return None
 
 
 @sio.event
@@ -25,28 +37,38 @@ async def disconnect(sid):
     """When client disconnects"""
     print(f"Client disconnected: {sid}")
 
-    # Remove player from room
-    room = game_manager.get_room()
-    if sid in room.players:
-        room.remove_player(sid)
+    # Get the room this socket was in
+    room_code = socket_rooms.get(sid)
+    if room_code:
+        room = game_manager.get_room(room_code)
+        if room and sid in room.players:
+            room.remove_player(sid)
 
-        # Notify other players
-        await sio.emit('player_left', {
-            'player_id': sid,
-            'room_state': room.to_dict()
-        }, room=room.room_code)
+            # Notify other players
+            await sio.emit('player_left', {
+                'player_id': sid,
+                'room_state': room.to_dict()
+            }, room=room.room_code)
 
-        # Reset room if empty
-        if len(room.players) == 0:
-            game_manager.reset_room()
+            # Reset room if empty and game is over
+            if len(room.players) == 0 and room.phase == GamePhase.GAME_OVER:
+                game_manager.reset_room(room_code)
+
+        # Remove from tracking
+        del socket_rooms[sid]
 
 
 @sio.on('join_game')
 async def handle_join_game(sid, data):
-    """Join the fixed game room"""
+    """Join a specific game room"""
     player_name = data.get('player_name', 'Anonymous')
+    room_code = data.get('room_code', 'ALI_KUSCU')  # Default to first room
 
-    room = game_manager.get_room()
+    room = game_manager.get_room(room_code)
+
+    if not room:
+        await sio.emit('error', {'message': 'Oda bulunamadı!'}, room=sid)
+        return
 
     if room.phase != GamePhase.WAITING:
         await sio.emit('error', {'message': 'Oyun zaten başladı!'}, room=sid)
@@ -67,6 +89,9 @@ async def handle_join_game(sid, data):
         await sio.emit('error', {'message': 'Oda dolu! (Maksimum 4 oyuncu)'}, room=sid)
         return
 
+    # Track which room this socket is in
+    socket_rooms[sid] = room_code
+
     # Add to Socket.IO room
     await sio.enter_room(sid, room.room_code)
 
@@ -86,11 +111,11 @@ async def handle_join_game(sid, data):
 @sio.on('start_game')
 async def handle_start_game(sid, data):
     """Start game"""
-    room = game_manager.get_room()
+    room = get_player_room(sid)
 
     # Only host can start
     if not room.players.get(sid) or not room.players[sid].is_host:
-        await sio.emit('error', {'message': 'Sadece host oyunu başlatabilir!'}, room=sid)
+        await sio.emit('error', {'message': 'Sadece oyun yöneticisi oyunu başlatabilir!'}, room=sid)
         return
 
     # Get questions from database
@@ -134,7 +159,7 @@ async def handle_start_game(sid, data):
 async def handle_submit_fake_answer(sid, data):
     """Submit fake answer"""
     fake_answer = data.get('answer', '').strip()
-    room = game_manager.get_room()
+    room = get_player_room(sid)
 
     # Allow empty answers (for timeout penalty)
     success = room.submit_fake_answer(sid, fake_answer)
@@ -181,7 +206,7 @@ async def handle_submit_fake_answer(sid, data):
 async def handle_submit_vote(sid, data):
     """Submit vote"""
     chosen_answer = data.get('answer', '')
-    room = game_manager.get_room()
+    room = get_player_room(sid)
 
     success = room.submit_vote(sid, chosen_answer)
 
@@ -240,7 +265,7 @@ async def auto_next_round(room_code, round_number):
     """Automatically advance to next round after delay"""
     await asyncio.sleep(10)  # Wait 10 seconds
 
-    room = game_manager.get_room()
+    room = game_manager.get_room(room_code)
 
     # Check if we're still on the same round (in case someone manually advanced)
     if room.current_round != round_number or room.phase != GamePhase.SHOWING_RESULTS:
@@ -281,7 +306,7 @@ async def auto_finish_final_test(room_code):
     """Automatically finish final test after 120 seconds"""
     await asyncio.sleep(120)  # Wait 120 seconds
 
-    room = game_manager.get_room()
+    room = game_manager.get_room(room_code)
 
     # Check if we're still in final test (in case already finished)
     if room.phase != GamePhase.FINAL_TEST:
@@ -294,11 +319,11 @@ async def auto_finish_final_test(room_code):
 @sio.on('next_round')
 async def handle_next_round(sid, data):
     """Move to next round"""
-    room = game_manager.get_room()
+    room = get_player_room(sid)
 
     # Only host can proceed
     if not room.players.get(sid) or not room.players[sid].is_host:
-        await sio.emit('error', {'message': 'Sadece host devam edebilir!'}, room=sid)
+        await sio.emit('error', {'message': 'Sadece oyun yöneticisi devam edebilir!'}, room=sid)
         return
 
     room.next_round()
@@ -336,7 +361,7 @@ async def handle_submit_final_answer(sid, data):
     """Submit final test answer"""
     question_index = data.get('question_index', 0)
     answer = data.get('answer', '').strip()
-    room = game_manager.get_room()
+    room = get_player_room(sid)
 
     success = room.submit_final_answer(sid, question_index, answer)
 

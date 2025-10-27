@@ -148,6 +148,13 @@ async def get_categories(db: Session = Depends(get_db)):
     return [cat[0] for cat in categories if cat[0]]
 
 
+@app.get("/api/rooms")
+async def get_rooms():
+    """Tüm odaları listele"""
+    from .game_manager import game_manager
+    return game_manager.get_all_rooms()
+
+
 # Socket.IO'yu FastAPI'ye mount et
 app.mount("/socket.io", socket_app)
 
