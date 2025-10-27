@@ -261,6 +261,9 @@ async def auto_next_round(room_code, round_number):
                 for i, q in enumerate(room.questions)
             ]
         }, room=room_code)
+
+        # Start timeout for final test (120 seconds)
+        asyncio.create_task(auto_finish_final_test(room_code))
     else:
         # New round
         current_round = room.rounds[room.current_round]
@@ -272,6 +275,20 @@ async def auto_next_round(room_code, round_number):
                 'text': current_round.question_text
             }
         }, room=room_code)
+
+
+async def auto_finish_final_test(room_code):
+    """Automatically finish final test after 120 seconds"""
+    await asyncio.sleep(120)  # Wait 120 seconds
+
+    room = game_manager.get_room()
+
+    # Check if we're still in final test (in case already finished)
+    if room.phase != GamePhase.FINAL_TEST:
+        return
+
+    # Show final results to all players
+    await show_final_results(room)
 
 
 @sio.on('next_round')
@@ -298,6 +315,9 @@ async def handle_next_round(sid, data):
                 for i, q in enumerate(room.questions)
             ]
         }, room=room.room_code)
+
+        # Start timeout for final test (120 seconds)
+        asyncio.create_task(auto_finish_final_test(room.room_code))
     else:
         # New round
         current_round = room.rounds[room.current_round]
@@ -329,38 +349,45 @@ async def handle_submit_final_answer(sid, data):
         'success': True
     }, room=sid)
 
+    # Check if all players have answered all questions
+    all_completed = True
+    for player in room.players.values():
+        if len(player.final_answers) < len(room.questions):
+            all_completed = False
+            break
 
-@sio.on('finish_game')
-async def handle_finish_game(sid, data):
-    """Finish game and calculate final scores for individual player"""
-    room = game_manager.get_room()
+    # If all players completed, show results
+    if all_completed:
+        await show_final_results(room)
 
-    # Calculate only this player's final score
-    player = room.players.get(sid)
-    if not player:
-        await sio.emit('error', {'message': 'Oyuncu bulunamadı!'}, room=sid)
-        return
 
-    # Calculate this player's final test score using check_answer
-    correct_count = 0
-    for i, question in enumerate(room.questions):
-        user_answer = player.final_answers.get(i, "")
-        if check_answer(user_answer, question['correct_answer'], question.get('acceptable_answers')):
-            correct_count += 1
+async def show_final_results(room):
+    """Calculate and show final results to all players"""
+    final_scores = {}
 
-    # Add bonus points
-    bonus_score = correct_count * 500
-    player.score += bonus_score
+    # Calculate scores for all players
+    for player_id, player in room.players.items():
+        correct_count = 0
+        for i, question in enumerate(room.questions):
+            user_answer = player.final_answers.get(i, "")
+            if check_answer(user_answer, question['correct_answer'], question.get('acceptable_answers')):
+                correct_count += 1
 
-    # Send results only to this player
+        # Add bonus points
+        bonus_score = correct_count * 500
+        player.score += bonus_score
+
+        final_scores[player_id] = {
+            'correct_count': correct_count,
+            'bonus_score': bonus_score,
+            'total_score': player.score
+        }
+
+    room.phase = GamePhase.GAME_OVER
+
+    # Send results to all players
     await sio.emit('game_over', {
-        'final_scores': {
-            sid: {
-                'correct_count': correct_count,
-                'bonus_score': bonus_score,
-                'total_score': player.score
-            }
-        },
+        'final_scores': final_scores,
         'leaderboard': room.get_leaderboard(),
         'questions_summary': [
             {
@@ -369,7 +396,14 @@ async def handle_finish_game(sid, data):
             }
             for q in room.questions
         ]
-    }, room=sid)
+    }, room=room.room_code)
+
+
+@sio.on('finish_game')
+async def handle_finish_game(sid, data):
+    """Finish game - deprecated, now handled automatically"""
+    # This is now handled automatically when all players submit or timeout
+    pass
 
 
 # Create ASGI application

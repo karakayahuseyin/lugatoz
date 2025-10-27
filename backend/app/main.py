@@ -31,6 +31,7 @@ app.add_middleware(
 class QuestionCreate(BaseModel):
     question_text: str
     correct_answer: str
+    acceptable_answers: str = None
     category: str = None
     difficulty: str = "medium"
 
@@ -39,6 +40,7 @@ class QuestionResponse(BaseModel):
     id: int
     question_text: str
     correct_answer: str
+    acceptable_answers: str | None
     category: str | None
     difficulty: str
     is_active: bool

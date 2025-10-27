@@ -86,6 +86,48 @@
     }
   }
 
+  function startEdit(question) {
+    editingQuestion = { ...question };
+    showAddForm = false;
+  }
+
+  function cancelEdit() {
+    editingQuestion = null;
+  }
+
+  async function updateQuestion() {
+    if (!editingQuestion.question_text || !editingQuestion.correct_answer) {
+      alert('Soru ve cevap alanları zorunludur!');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/questions/${editingQuestion.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question_text: editingQuestion.question_text,
+          correct_answer: editingQuestion.correct_answer,
+          acceptable_answers: editingQuestion.acceptable_answers,
+          category: editingQuestion.category,
+          difficulty: editingQuestion.difficulty
+        })
+      });
+
+      if (response.ok) {
+        alert('Soru başarıyla güncellendi!');
+        editingQuestion = null;
+        await loadQuestions();
+        await loadCategories();
+      } else {
+        alert('Soru güncellenemedi!');
+      }
+    } catch (error) {
+      console.error('Soru güncellenemedi:', error);
+      alert('Soru güncellenirken bir hata oluştu!');
+    }
+  }
+
   async function deleteQuestion(id) {
     if (!confirm('Bu soruyu silmek istediğinizden emin misiniz?')) {
       return;
@@ -264,6 +306,93 @@
           </div>
         </div>
       {/if}
+
+      {#if editingQuestion}
+        <div class="bg-yellow-50 p-6 rounded-lg border-2 border-yellow-300 mb-6">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-bold text-gray-800">Soru Düzenle</h2>
+            <button
+              on:click={cancelEdit}
+              class="text-gray-500 hover:text-gray-700 font-semibold"
+            >
+              ✕ İptal
+            </button>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Soru Metni
+              </label>
+              <textarea
+                bind:value={editingQuestion.question_text}
+                placeholder="Sorunuzu buraya yazın..."
+                class="input min-h-[80px]"
+              ></textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Doğru Cevap (Görünür)
+              </label>
+              <input
+                type="text"
+                bind:value={editingQuestion.correct_answer}
+                placeholder="Doğru cevabı girin"
+                class="input"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Kabul Edilebilir Cevaplar (Virgülle ayırın)
+              </label>
+              <input
+                type="text"
+                bind:value={editingQuestion.acceptable_answers}
+                placeholder="ankara,turkiyenin baskenti"
+                class="input"
+              />
+              <p class="text-xs text-gray-500 mt-1">
+                Alternatif doğru cevaplar. Virgülle ayırın, küçük harfle yazın.
+              </p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  Kategori
+                </label>
+                <input
+                  type="text"
+                  bind:value={editingQuestion.category}
+                  placeholder="Örn: Tarih, Coğrafya"
+                  class="input"
+                  list="categories"
+                />
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  Zorluk
+                </label>
+                <select bind:value={editingQuestion.difficulty} class="input">
+                  <option value="easy">Kolay</option>
+                  <option value="medium">Orta</option>
+                  <option value="hard">Zor</option>
+                </select>
+              </div>
+            </div>
+
+            <button
+              on:click={updateQuestion}
+              class="btn btn-primary w-full"
+            >
+              Değişiklikleri Kaydet
+            </button>
+          </div>
+        </div>
+      {/if}
     </div>
 
     <div class="bg-white rounded-2xl shadow-2xl p-8">
@@ -286,13 +415,26 @@
                   <p class="text-sm text-cyan-700 font-semibold">
                     ✓ {question.correct_answer}
                   </p>
+                  {#if question.acceptable_answers}
+                    <p class="text-xs text-gray-500 mt-1">
+                      Kabul edilebilir: {question.acceptable_answers}
+                    </p>
+                  {/if}
                 </div>
-                <button
-                  on:click={() => deleteQuestion(question.id)}
-                  class="btn btn-danger text-sm py-2 px-4"
-                >
-                  Sil
-                </button>
+                <div class="flex gap-2">
+                  <button
+                    on:click={() => startEdit(question)}
+                    class="btn btn-secondary text-sm py-2 px-4"
+                  >
+                    Düzenle
+                  </button>
+                  <button
+                    on:click={() => deleteQuestion(question.id)}
+                    class="btn btn-danger text-sm py-2 px-4"
+                  >
+                    Sil
+                  </button>
+                </div>
               </div>
 
               <div class="flex gap-2">
