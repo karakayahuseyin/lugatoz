@@ -12,7 +12,7 @@ from .websocket import socket_app
 
 # FastAPI uygulaması
 app = FastAPI(
-    title="ÖzBilig API",
+    title="LügaTöz API",
     description="Eğitici multiplayer aldatma oyunu",
     version="1.0.0"
 )
@@ -54,7 +54,7 @@ class QuestionResponse(BaseModel):
 async def root():
     """Ana endpoint"""
     return {
-        "message": "ÖzBilig API'ye hoş geldiniz!",
+        "message": "LügaTöz API'ye hoş geldiniz!",
         "version": "1.0.0",
         "endpoints": {
             "health": "/health",
@@ -67,7 +67,7 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Sağlık kontrolü"""
-    return {"status": "healthy", "service": "ozbilig"}
+    return {"status": "healthy", "service": "lugatoz"}
 
 
 @app.get("/api/questions", response_model=List[QuestionResponse])
@@ -162,7 +162,7 @@ app.mount("/socket.io", socket_app)
 # Başlangıçta veritabanını initialize et
 @app.on_event("startup")
 async def startup_event():
-    print("🚀 ÖzBilig sunucusu başlatılıyor...")
+    print("🚀 LügaTöz sunucusu başlatılıyor...")
     init_db()
     print("✓ Sunucu hazır!")
 

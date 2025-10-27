@@ -3,7 +3,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: ozbilig-backend-prod
+    container_name: lugatoz-backend-prod
     ports:
       - "8000:8000"
     volumes:
@@ -13,24 +13,24 @@ services:
       - ENVIRONMENT=production
     restart: always
     networks:
-      - ozbilig-network
+      - lugatoz-network
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
-    container_name: ozbilig-frontend-prod
+    container_name: lugatoz-frontend-prod
     ports:
       - "8080:80"
     depends_on:
       - backend
     restart: always
     networks:
-      - ozbilig-network
+      - lugatoz-network
 
 volumes:
   backend-db:
 
 networks:
-  ozbilig-network:
+  lugatoz-network:
     driver: bridge

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🚀 ÖzBilig Production Deployment"
+echo "🚀 LügaTöz Production Deployment"
 echo "================================"
 
 # Renk kodları

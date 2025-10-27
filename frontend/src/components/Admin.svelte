@@ -8,7 +8,7 @@
   let isAuthenticated = false;
   let passwordInput = '';
 
-  const ADMIN_PASSWORD = 'ozbilig23';
+  const ADMIN_PASSWORD = 'lugatoz23';
 
   let newQuestion = {
     question_text: '',
@@ -156,7 +156,7 @@
     <!-- Login Screen -->
     <div class="max-w-md mx-auto mt-20">
       <div class="bg-white rounded-2xl shadow-2xl p-8">
-        <h1 class="text-3xl font-bold text-primary text-center mb-6">ÖzBilig Admin Paneli</h1>
+        <h1 class="text-3xl font-bold text-primary text-center mb-6">LügaTöz Admin Paneli</h1>
 
         <div class="space-y-4">
           <div>
@@ -193,7 +193,7 @@
     <div class="max-w-6xl mx-auto">
       <div class="bg-white rounded-2xl shadow-2xl p-8 mb-6">
         <div class="flex justify-between items-center mb-6">
-          <h1 class="text-4xl font-bold text-primary">ÖzBilig Admin Paneli</h1>
+          <h1 class="text-4xl font-bold text-primary">LügaTöz Admin Paneli</h1>
           <a href="/#" class="btn btn-secondary">
             Oyuna Dön
           </a>

@@ -1,4 +1,4 @@
-# ÖzBilig Deployment Rehberi
+# LügaTöz Deployment Rehberi
 
 ## 🚀 Production Deployment
 
@@ -12,7 +12,7 @@
 #### 1. Repository'yi Klonlayın
 ```bash
 git clone <repository-url>
-cd ozbilig
+cd lugatoz
 ```
 
 #### 2. Production Build ve Deploy
@@ -55,17 +55,17 @@ docker compose -f docker-compose.prod.yml logs -f frontend
 #### Veritabanını Yedekle
 ```bash
 docker run --rm \
-  -v ozbilig_backend-db:/data \
+  -v lugatoz_backend-db:/data \
   -v $(pwd):/backup \
-  alpine tar czf /backup/ozbilig-db-backup-$(date +%Y%m%d).tar.gz -C /data .
+  alpine tar czf /backup/lugatoz-db-backup-$(date +%Y%m%d).tar.gz -C /data .
 ```
 
 #### Veritabanını Geri Yükle
 ```bash
 docker run --rm \
-  -v ozbilig_backend-db:/data \
+  -v lugatoz_backend-db:/data \
   -v $(pwd):/backup \
-  alpine sh -c "cd /data && tar xzf /backup/ozbilig-db-backup-YYYYMMDD.tar.gz"
+  alpine sh -c "cd /data && tar xzf /backup/lugatoz-db-backup-YYYYMMDD.tar.gz"
 ```
 
 ### 📊 Admin Paneli Kullanımı
@@ -159,7 +159,7 @@ docker compose -f docker-compose.prod.yml logs --tail=100
 curl http://localhost:8000/api/questions
 
 # Database volume'ü kontrol et
-docker volume ls | grep ozbilig
+docker volume ls | grep lugatoz
 ```
 
 ### 🔄 Güncelleme
@@ -196,7 +196,7 @@ Otomatik backup için crontab ekleyin:
 crontab -e
 
 # Her gece saat 3'te backup al
-0 3 * * * cd /path/to/ozbilig && docker run --rm -v ozbilig_backend-db:/data -v $(pwd):/backup alpine tar czf /backup/ozbilig-db-backup-$(date +\%Y\%m\%d).tar.gz -C /data .
+0 3 * * * cd /path/to/lugatoz && docker run --rm -v lugatoz_backend-db:/data -v $(pwd):/backup alpine tar czf /backup/lugatoz-db-backup-$(date +\%Y\%m\%d).tar.gz -C /data .
 ```
 
 ### 📞 Destek

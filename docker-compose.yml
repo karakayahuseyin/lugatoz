@@ -3,7 +3,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: ozbilig-backend
+    container_name: lugatoz-backend
     ports:
       - "8000:8000"
     volumes:
@@ -13,13 +13,13 @@ services:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
     networks:
-      - ozbilig-network
+      - lugatoz-network
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: ozbilig-frontend
+    container_name: lugatoz-frontend
     ports:
       - "5173:5173"
     volumes:
@@ -29,11 +29,11 @@ services:
       - backend
     restart: unless-stopped
     networks:
-      - ozbilig-network
+      - lugatoz-network
 
 volumes:
   backend-db:
 
 networks:
-  ozbilig-network:
+  lugatoz-network:
     driver: bridge

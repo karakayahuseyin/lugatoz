@@ -5,7 +5,7 @@ from .models import Base, Question
 import os
 
 # SQLite veritabanı dosya yolu
-DATABASE_URL = "sqlite:///./data/ozbilig.db"
+DATABASE_URL = "sqlite:///./data/lugatoz.db"
 
 # Engine oluştur
 engine = create_engine(
