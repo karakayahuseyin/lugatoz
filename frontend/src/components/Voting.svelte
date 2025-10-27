@@ -22,9 +22,7 @@
     socketManager.emit('submit_vote', {
       answer: selectedAnswer
     });
-
-    if (timer) timer.stop();
-    updateGameState({ votedAnswer: true });
+    // Don't set votedAnswer here - wait for backend confirmation
   }
 
   function handleTimeout() {
@@ -41,6 +39,14 @@
       updateGameState({ votedAnswer: true });
     }
   }
+
+  // Listen for success from backend
+  socketManager.on('vote_submitted', (data) => {
+    if (data.success) {
+      if (timer) timer.stop();
+      updateGameState({ votedAnswer: true });
+    }
+  });
 
   // Listen for error from backend
   socketManager.on('vote_rejected', (data) => {

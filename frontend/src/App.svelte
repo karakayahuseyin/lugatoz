@@ -114,6 +114,10 @@
       socket.on('error', (data) => {
         setError(data.message);
       });
+
+      socket.on('name_taken', (data) => {
+        notifications.error(data.message);
+      });
     }
   });
 

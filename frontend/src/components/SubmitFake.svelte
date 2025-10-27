@@ -17,9 +17,7 @@
     socketManager.emit('submit_fake_answer', {
       answer: fakeAnswer.trim()
     });
-
-    if (timer) timer.stop();
-    updateGameState({ submittedAnswer: true });
+    // Don't set submittedAnswer here - wait for backend confirmation
   }
 
   function handleTimeout() {
@@ -36,6 +34,14 @@
       updateGameState({ submittedAnswer: true });
     }
   }
+
+  // Listen for success from backend
+  socketManager.on('fake_answer_submitted', (data) => {
+    if (data.success) {
+      if (timer) timer.stop();
+      updateGameState({ submittedAnswer: true });
+    }
+  });
 
   // Listen for error from backend
   socketManager.on('answer_rejected', (data) => {
