@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { gameState, updateGameState, setError, resetGameState } from './stores/gameStore';
   import { socketManager } from './utils/socket';
+  import { notifications } from './stores/notificationStore';
 
   import Home from './components/Home.svelte';
   import Lobby from './components/Lobby.svelte';
@@ -11,6 +12,7 @@
   import FinalTest from './components/FinalTest.svelte';
   import GameOver from './components/GameOver.svelte';
   import Admin from './components/Admin.svelte';
+  import Notification from './components/Notification.svelte';
 
   let socket;
   let currentRoute = 'game'; // 'game' or 'admin'
@@ -148,6 +150,16 @@
     <GameOver />
   {/if}
 </main>
+
+<!-- Notifications -->
+{#each $notifications as notification (notification.id)}
+  <Notification
+    message={notification.message}
+    type={notification.type}
+    duration={notification.duration}
+    onClose={() => notifications.remove(notification.id)}
+  />
+{/each}
 
 <style>
   main {

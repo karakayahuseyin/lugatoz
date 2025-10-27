@@ -1,6 +1,7 @@
 <script>
   import { gameState, updateGameState } from '../stores/gameStore';
   import { socketManager } from '../utils/socket';
+  import { notifications } from '../stores/notificationStore';
   import Timer from './Timer.svelte';
 
   let selectedAnswer = null;
@@ -14,7 +15,7 @@
 
   function submitVote() {
     if (!selectedAnswer) {
-      alert('Lütfen bir cevap seçin!');
+      notifications.warning('Lütfen bir cevap seçin!');
       return;
     }
 
@@ -32,7 +33,7 @@
     if (selectedAnswer) {
       submitVote();
     } else {
-      alert('Süre doldu! Cevap seçmediniz, -100 puan cezası aldınız.');
+      notifications.error('Süre doldu! Cevap seçmediniz, -100 puan cezası aldınız.');
       // Submit empty to trigger penalty
       socketManager.emit('submit_vote', {
         answer: ''
@@ -44,7 +45,7 @@
   // Listen for error from backend
   socketManager.on('vote_rejected', (data) => {
     if (data.reason === 'own_answer') {
-      alert('Kendi yanlış cevabınızı seçemezsiniz!');
+      notifications.error('Kendi yanlış cevabınızı seçemezsiniz!');
       selectedAnswer = null;
     }
   });

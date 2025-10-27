@@ -1,6 +1,7 @@
 <script>
   import { gameState, updateGameState } from '../stores/gameStore';
   import { socketManager } from '../utils/socket';
+  import { notifications } from '../stores/notificationStore';
   import Timer from './Timer.svelte';
 
   let fakeAnswer = '';
@@ -9,7 +10,7 @@
 
   function submitFakeAnswer() {
     if (!fakeAnswer.trim()) {
-      alert('Lütfen bir cevap girin!');
+      notifications.warning('Lütfen bir cevap girin!');
       return;
     }
 
@@ -27,7 +28,7 @@
     if (fakeAnswer.trim()) {
       submitFakeAnswer();
     } else {
-      alert('Süre doldu! Cevap girmediniz, -100 puan cezası aldınız.');
+      notifications.error('Süre doldu! Cevap girmediniz, -100 puan cezası aldınız.');
       // Submit empty to trigger penalty
       socketManager.emit('submit_fake_answer', {
         answer: ''
@@ -39,7 +40,10 @@
   // Listen for error from backend
   socketManager.on('answer_rejected', (data) => {
     if (data.reason === 'correct_answer') {
-      alert('Doğru cevabı giremezsiniz! Yanlış ama inandırıcı bir cevap girmelisiniz.');
+      notifications.error('Doğru cevabı giremezsiniz! Yanlış ama inandırıcı bir cevap girmelisiniz.');
+      fakeAnswer = '';
+    } else if (data.reason === 'duplicate_answer') {
+      notifications.warning('Bu cevap zaten başka bir oyuncu tarafından girildi! Farklı bir cevap deneyin.');
       fakeAnswer = '';
     }
   });

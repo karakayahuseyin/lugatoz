@@ -151,16 +151,22 @@ class GameRoom:
             return False
 
         current_round = self.rounds[self.current_round]
+        normalized_answer = normalize_answer(fake_answer)
 
         # Normalize and check if answer is correct (prevent submitting correct answer)
         if check_answer(fake_answer, current_round.correct_answer, current_round.acceptable_answers):
             return False  # Cannot submit correct answer as fake
 
+        # Check if answer already submitted by another player
+        existing_answers = [normalize_answer(ans) for ans in current_round.fake_answers.values()]
+        if normalized_answer in existing_answers:
+            return False  # Cannot submit duplicate answer
+
         # Check time limit (20 seconds)
         submit_time = time.time()
         time_taken = submit_time - current_round.start_time
 
-        current_round.fake_answers[socket_id] = normalize_answer(fake_answer)
+        current_round.fake_answers[socket_id] = normalized_answer
         player = self.players[socket_id]
         player.submitted_answer = normalize_answer(fake_answer)
         player.submit_time = submit_time

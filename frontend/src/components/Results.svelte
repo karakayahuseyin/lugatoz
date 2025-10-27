@@ -1,16 +1,35 @@
 <script>
   import { gameState } from '../stores/gameStore';
   import { socketManager } from '../utils/socket';
+  import Timer from './Timer.svelte';
+
+  let timer;
 
   function nextRound() {
+    if (timer) timer.stop();
     socketManager.emit('next_round', {});
+  }
+
+  function handleTimeout() {
+    // Auto proceed if host
+    if ($gameState.isHost) {
+      nextRound();
+    }
   }
 </script>
 
 <div class="card max-w-4xl w-full">
-  <div class="text-center mb-6">
-    <h1 class="text-4xl font-bold text-primary mb-2">Tur Sonuçları</h1>
-    <p class="text-gray-600">Soru {$gameState.currentRound + 1} tamamlandı!</p>
+  <div class="mb-6">
+    <div class="flex justify-between items-start mb-4">
+      <div class="flex-1"></div>
+      <div class="flex-1 text-center">
+        <h1 class="text-4xl font-bold text-primary mb-2">Tur Sonuçları</h1>
+        <p class="text-gray-600">Soru {$gameState.currentRound + 1} tamamlandı!</p>
+      </div>
+      <div class="flex-1 flex justify-end">
+        <Timer bind:this={timer} duration={10} onTimeout={handleTimeout} />
+      </div>
+    </div>
   </div>
 
   <div class="bg-gradient-to-r from-cyan-100 to-emerald-100 p-6 rounded-xl border-2 border-cyan-300 mb-6">

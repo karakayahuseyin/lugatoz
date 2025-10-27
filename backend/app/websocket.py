@@ -51,6 +51,15 @@ async def handle_join_game(sid, data):
         await sio.emit('error', {'message': 'Oyun zaten başladı!'}, room=sid)
         return
 
+    # Check if name already exists
+    existing_names = [p.name.lower() for p in room.players.values()]
+    if player_name.lower() in existing_names:
+        await sio.emit('name_taken', {
+            'message': 'Bu isim zaten kullanılıyor! Lütfen farklı bir isim seçin.',
+            'suggested_name': f"{player_name}{len(room.players) + 1}"
+        }, room=sid)
+        return
+
     success = room.add_player(sid, player_name)
 
     if not success:
@@ -135,10 +144,18 @@ async def handle_submit_fake_answer(sid, data):
     if not success:
         # Check if it was because answer is correct
         current_round = room.rounds[room.current_round]
+        from .game_manager import normalize_answer
+
         if check_answer(fake_answer, current_round.correct_answer, current_round.acceptable_answers):
             await sio.emit('answer_rejected', {
                 'reason': 'correct_answer',
                 'message': 'Doğru cevabı giremezsiniz!'
+            }, room=sid)
+        # Check if duplicate
+        elif normalize_answer(fake_answer) in [normalize_answer(ans) for ans in current_round.fake_answers.values()]:
+            await sio.emit('answer_rejected', {
+                'reason': 'duplicate_answer',
+                'message': 'Bu cevap zaten başka bir oyuncu tarafından girildi!'
             }, room=sid)
         else:
             await sio.emit('error', {'message': 'Cevap gönderilemedi!'}, room=sid)

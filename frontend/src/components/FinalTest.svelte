@@ -1,6 +1,7 @@
 <script>
   import { gameState } from '../stores/gameStore';
   import { socketManager } from '../utils/socket';
+  import { notifications } from '../stores/notificationStore';
   import Timer from './Timer.svelte';
 
   let answers = {};
@@ -27,7 +28,7 @@
     if (isSubmitted) return;
 
     if (!allAnswered) {
-      alert('Lütfen tüm soruları cevaplayın!');
+      notifications.warning('Lütfen tüm soruları cevaplayın!');
       return;
     }
 
@@ -46,7 +47,7 @@
     // Auto-submit all answers
     if (isSubmitted) return;
 
-    alert('Süre doldu! Cevaplarınız otomatik olarak gönderildi.');
+    notifications.info('Süre doldu! Cevaplarınız otomatik olarak gönderildi.');
 
     // Submit all answered questions
     $gameState.finalQuestions.forEach((q, i) => {

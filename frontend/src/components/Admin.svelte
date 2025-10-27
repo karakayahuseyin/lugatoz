@@ -13,6 +13,7 @@
   let newQuestion = {
     question_text: '',
     correct_answer: '',
+    acceptable_answers: '',
     category: '',
     difficulty: 'medium'
   };
@@ -69,6 +70,7 @@
         newQuestion = {
           question_text: '',
           correct_answer: '',
+          acceptable_answers: '',
           category: '',
           difficulty: 'medium'
         };
@@ -197,7 +199,7 @@
 
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">
-                Doğru Cevap
+                Doğru Cevap (Görünür)
               </label>
               <input
                 type="text"
@@ -205,6 +207,21 @@
                 placeholder="Doğru cevabı girin"
                 class="input"
               />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Kabul Edilebilir Cevaplar (Virgülle ayırın)
+              </label>
+              <input
+                type="text"
+                bind:value={newQuestion.acceptable_answers}
+                placeholder="ankara,turkiyenin baskenti"
+                class="input"
+              />
+              <p class="text-xs text-gray-500 mt-1">
+                Alternatif doğru cevaplar. Virgülle ayırın, küçük harfle yazın.
+              </p>
             </div>
 
             <div class="grid grid-cols-2 gap-4">

@@ -1,12 +1,13 @@
 <script>
   import { gameState, updateGameState } from '../stores/gameStore';
   import { socketManager } from '../utils/socket';
+  import { notifications } from '../stores/notificationStore';
 
   let playerName = '';
 
   function joinGame() {
     if (!playerName.trim()) {
-      alert('Lütfen isminizi girin!');
+      notifications.warning('Lütfen isminizi girin!');
       return;
     }
 
@@ -16,6 +17,14 @@
       player_name: playerName.trim()
     });
   }
+
+  // Listen for name_taken event
+  socketManager.on('name_taken', (data) => {
+    notifications.error(data.message);
+    if (data.suggested_name) {
+      playerName = data.suggested_name;
+    }
+  });
 </script>
 
 <div class="card max-w-md w-full">
