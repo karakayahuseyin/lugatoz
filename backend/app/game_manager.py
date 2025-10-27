@@ -403,6 +403,11 @@ class GameManager:
         rooms_status = []
         for room_info in self.FIXED_ROOMS:
             room = self.rooms[room_info["code"]]
+            # Room is available if: waiting phase OR game over with less than max players
+            is_available = (
+                (room.phase == GamePhase.WAITING and len(room.players) < room.max_players) or
+                (room.phase == GamePhase.GAME_OVER and len(room.players) < room.max_players)
+            )
             rooms_status.append({
                 "code": room_info["code"],
                 "name": room_info["name"],
@@ -410,7 +415,7 @@ class GameManager:
                 "players": len(room.players),
                 "max_players": room.max_players,
                 "phase": room.phase.value,
-                "available": len(room.players) < room.max_players and room.phase == GamePhase.WAITING
+                "available": is_available
             })
         return rooms_status
 

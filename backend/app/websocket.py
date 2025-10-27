@@ -42,20 +42,24 @@ async def disconnect(sid):
     if room_code:
         room = game_manager.get_room(room_code)
         if room and sid in room.players:
+            player_name = room.players[sid].name
             room.remove_player(sid)
 
             # Notify other players
             await sio.emit('player_left', {
                 'player_id': sid,
+                'player_name': player_name,
                 'room_state': room.to_dict()
             }, room=room.room_code)
 
-            # Reset room if empty and game is over
-            if len(room.players) == 0 and room.phase == GamePhase.GAME_OVER:
+            # Reset room if empty
+            if len(room.players) == 0:
                 game_manager.reset_room(room_code)
+                print(f"Room {room_code} reset (empty after disconnect)")
 
         # Remove from tracking
-        del socket_rooms[sid]
+        if sid in socket_rooms:
+            del socket_rooms[sid]
 
 
 @sio.on('join_game')
@@ -429,6 +433,73 @@ async def handle_finish_game(sid, data):
     """Finish game - deprecated, now handled automatically"""
     # This is now handled automatically when all players submit or timeout
     pass
+
+
+@sio.on('leave_room')
+async def handle_leave_room(sid, data):
+    """Player leaves room"""
+    room_code = socket_rooms.get(sid)
+    if room_code:
+        room = game_manager.get_room(room_code)
+        if room and sid in room.players:
+            player_name = room.players[sid].name
+            room.remove_player(sid)
+
+            # Notify other players
+            await sio.emit('player_left', {
+                'player_id': sid,
+                'player_name': player_name,
+                'room_state': room.to_dict()
+            }, room=room.room_code)
+
+            # Reset room if empty
+            if len(room.players) == 0:
+                game_manager.reset_room(room_code)
+                print(f"Room {room_code} reset (empty)")
+
+        # Leave Socket.IO room
+        await sio.leave_room(sid, room_code)
+
+        # Remove from tracking
+        if sid in socket_rooms:
+            del socket_rooms[sid]
+
+        print(f"Player left room {room_code}")
+
+
+@sio.on('reset_room')
+async def handle_reset_room(sid, data):
+    """Reset room for new game (only host can do this)"""
+    room_code = socket_rooms.get(sid)
+    if not room_code:
+        await sio.emit('error', {'message': 'Bir odada değilsiniz!'}, room=sid)
+        return
+
+    room = game_manager.get_room(room_code)
+    if not room:
+        return
+
+    # Only host can reset
+    if not room.players.get(sid) or not room.players[sid].is_host:
+        await sio.emit('error', {'message': 'Sadece oyun yöneticisi odayı sıfırlayabilir!'}, room=sid)
+        return
+
+    # Remove all players from socket tracking
+    players_to_remove = list(socket_rooms.keys())
+    for player_sid in players_to_remove:
+        if socket_rooms.get(player_sid) == room_code:
+            await sio.leave_room(player_sid, room_code)
+            del socket_rooms[player_sid]
+
+    # Reset the room
+    game_manager.reset_room(room_code)
+
+    # Notify everyone that room was reset
+    await sio.emit('room_reset', {
+        'message': 'Oda sıfırlandı. Ana sayfaya yönlendiriliyorsunuz...'
+    }, room=room_code)
+
+    print(f"Room {room_code} reset by host")
 
 
 # Create ASGI application
