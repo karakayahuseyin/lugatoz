@@ -6,6 +6,7 @@ export default defineConfig({
   server: {
     port: 5173,
     host: '0.0.0.0',
+    base: '/ozbilig/',
     proxy: {
       '/api': {
         target: 'http://backend:8000',
