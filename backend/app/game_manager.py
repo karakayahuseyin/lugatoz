@@ -153,12 +153,31 @@ class GameRoom:
         current_round = self.rounds[self.current_round]
         normalized_answer = normalize_answer(fake_answer)
 
+        # If answer is empty (timeout penalty), accept it but don't add to options
+        if not normalized_answer:
+            submit_time = time.time()
+            time_taken = submit_time - current_round.start_time
+
+            player = self.players[socket_id]
+            player.submitted_answer = ""
+            player.submit_time = submit_time
+            player.score -= 100  # Penalty for not submitting
+
+            # Mark as submitted by adding empty string
+            current_round.fake_answers[socket_id] = ""
+
+            # If all players submitted, move to voting
+            if len(current_round.fake_answers) == len(self.players):
+                self._prepare_voting()
+
+            return True
+
         # Normalize and check if answer is correct (prevent submitting correct answer)
         if check_answer(fake_answer, current_round.correct_answer, current_round.acceptable_answers):
             return False  # Cannot submit correct answer as fake
 
-        # Check if answer already submitted by another player
-        existing_answers = [normalize_answer(ans) for ans in current_round.fake_answers.values()]
+        # Check if answer already submitted by another player (exclude empty strings)
+        existing_answers = [normalize_answer(ans) for ans in current_round.fake_answers.values() if ans]
         if normalized_answer in existing_answers:
             return False  # Cannot submit duplicate answer
 
@@ -185,8 +204,9 @@ class GameRoom:
         """Prepare voting options"""
         current_round = self.rounds[self.current_round]
 
-        # Mix all fake answers with correct answer
-        all_options = list(current_round.fake_answers.values()) + [normalize_answer(current_round.correct_answer)]
+        # Mix all fake answers with correct answer (exclude empty strings)
+        fake_answers_list = [ans for ans in current_round.fake_answers.values() if ans]
+        all_options = fake_answers_list + [normalize_answer(current_round.correct_answer)]
         random.shuffle(all_options)
 
         current_round.all_options = all_options
@@ -203,6 +223,23 @@ class GameRoom:
 
         current_round = self.rounds[self.current_round]
         normalized_choice = normalize_answer(chosen_answer)
+
+        # If vote is empty (timeout penalty), accept it
+        if not normalized_choice:
+            vote_time = time.time()
+
+            current_round.votes[socket_id] = ""
+            player = self.players[socket_id]
+            player.voted_answer = ""
+            player.vote_time = vote_time
+            player.score -= 100  # Penalty for not voting
+
+            # If all players voted, show results
+            if len(current_round.votes) == len(self.players):
+                self._calculate_scores()
+                self.phase = GamePhase.SHOWING_RESULTS
+
+            return True
 
         # Prevent voting for own fake answer
         player_fake_answer = current_round.fake_answers.get(socket_id)

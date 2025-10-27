@@ -135,10 +135,7 @@ async def handle_submit_fake_answer(sid, data):
     fake_answer = data.get('answer', '').strip()
     room = game_manager.get_room()
 
-    if not fake_answer:
-        await sio.emit('error', {'message': 'Cevap boş olamaz!'}, room=sid)
-        return
-
+    # Allow empty answers (for timeout penalty)
     success = room.submit_fake_answer(sid, fake_answer)
 
     if not success:
