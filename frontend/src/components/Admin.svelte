@@ -2,7 +2,6 @@
   import { onMount } from 'svelte';
 
   let questions = [];
-  let categories = [];
   let showAddForm = false;
   let editingQuestion = null;
   let isAuthenticated = false;
@@ -13,16 +12,13 @@
   let newQuestion = {
     question_text: '',
     correct_answer: '',
-    acceptable_answers: '',
-    category: '',
-    difficulty: 'medium'
+    acceptable_answers: ''
   };
 
   function checkPassword() {
     if (passwordInput === ADMIN_PASSWORD) {
       isAuthenticated = true;
       loadQuestions();
-      loadCategories();
     } else {
       alert('Yanlış şifre!');
       passwordInput = '';
@@ -43,14 +39,6 @@
     }
   }
 
-  async function loadCategories() {
-    try {
-      const response = await fetch('/api/categories');
-      categories = await response.json();
-    } catch (error) {
-      console.error('Kategoriler yüklenemedi:', error);
-    }
-  }
 
   async function addQuestion() {
     if (!newQuestion.question_text || !newQuestion.correct_answer) {
@@ -70,13 +58,10 @@
         newQuestion = {
           question_text: '',
           correct_answer: '',
-          acceptable_answers: '',
-          category: '',
-          difficulty: 'medium'
+          acceptable_answers: ''
         };
         showAddForm = false;
         await loadQuestions();
-        await loadCategories();
       } else {
         alert('Soru eklenemedi!');
       }
@@ -108,9 +93,7 @@
         body: JSON.stringify({
           question_text: editingQuestion.question_text,
           correct_answer: editingQuestion.correct_answer,
-          acceptable_answers: editingQuestion.acceptable_answers,
-          category: editingQuestion.category,
-          difficulty: editingQuestion.difficulty
+          acceptable_answers: editingQuestion.acceptable_answers
         })
       });
 
@@ -118,7 +101,6 @@
         alert('Soru başarıyla güncellendi!');
         editingQuestion = null;
         await loadQuestions();
-        await loadCategories();
       } else {
         alert('Soru güncellenemedi!');
       }
@@ -199,18 +181,14 @@
           </a>
         </div>
 
-      <div class="grid grid-cols-3 gap-4 mb-6">
+      <div class="grid grid-cols-2 gap-4 mb-6">
         <div class="bg-cyan-50 p-4 rounded-lg border-2 border-cyan-200">
           <p class="text-cyan-600 font-semibold">Toplam Soru</p>
           <p class="text-3xl font-bold text-cyan-700">{questions.length}</p>
         </div>
         <div class="bg-lime-50 p-4 rounded-lg border-2 border-lime-200">
-          <p class="text-lime-600 font-semibold">Kategori</p>
-          <p class="text-3xl font-bold text-lime-700">{categories.length}</p>
-        </div>
-        <div class="bg-cyan-50 p-4 rounded-lg border-2 border-cyan-200">
-          <p class="text-cyan-600 font-semibold">Aktif Soru</p>
-          <p class="text-3xl font-bold text-cyan-700">
+          <p class="text-lime-600 font-semibold">Aktif Soru</p>
+          <p class="text-3xl font-bold text-lime-700">
             {questions.filter(q => q.is_active).length}
           </p>
         </div>
@@ -264,37 +242,6 @@
               <p class="text-xs text-gray-500 mt-1">
                 Alternatif doğru cevaplar. Virgülle ayırın, küçük harfle yazın.
               </p>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                  Kategori
-                </label>
-                <input
-                  type="text"
-                  bind:value={newQuestion.category}
-                  placeholder="Örn: Tarih, Coğrafya"
-                  class="input"
-                  list="categories"
-                />
-                <datalist id="categories">
-                  {#each categories as cat}
-                    <option value={cat}></option>
-                  {/each}
-                </datalist>
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                  Zorluk
-                </label>
-                <select bind:value={newQuestion.difficulty} class="input">
-                  <option value="easy">Kolay</option>
-                  <option value="medium">Orta</option>
-                  <option value="hard">Zor</option>
-                </select>
-              </div>
             </div>
 
             <button
@@ -358,32 +305,6 @@
               </p>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                  Kategori
-                </label>
-                <input
-                  type="text"
-                  bind:value={editingQuestion.category}
-                  placeholder="Örn: Tarih, Coğrafya"
-                  class="input"
-                  list="categories"
-                />
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                  Zorluk
-                </label>
-                <select bind:value={editingQuestion.difficulty} class="input">
-                  <option value="easy">Kolay</option>
-                  <option value="medium">Orta</option>
-                  <option value="hard">Zor</option>
-                </select>
-              </div>
-            </div>
-
             <button
               on:click={updateQuestion}
               class="btn btn-primary w-full"
@@ -438,14 +359,6 @@
               </div>
 
               <div class="flex gap-2">
-                {#if question.category}
-                  <span class="text-xs bg-cyan-100 text-cyan-700 px-2 py-1 rounded-full">
-                    {question.category}
-                  </span>
-                {/if}
-                <span class="text-xs bg-lime-100 text-lime-700 px-2 py-1 rounded-full">
-                  {question.difficulty}
-                </span>
                 <span class="text-xs {question.is_active ? 'bg-cyan-100 text-cyan-700' : 'bg-red-100 text-red-700'} px-2 py-1 rounded-full">
                   {question.is_active ? 'Aktif' : 'Pasif'}
                 </span>

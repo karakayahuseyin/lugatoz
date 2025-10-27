@@ -131,8 +131,7 @@ async def handle_start_game(sid, data):
                 'id': q.id,
                 'question_text': q.question_text,
                 'correct_answer': q.correct_answer,
-                'acceptable_answers': q.acceptable_answers,
-                'category': q.category
+                'acceptable_answers': q.acceptable_answers
             }
             for q in questions_db
         ]
@@ -284,8 +283,7 @@ async def auto_next_round(room_code, round_number):
             'questions': [
                 {
                     'index': i,
-                    'question_text': q['question_text'],
-                    'category': q.get('category', '')
+                    'question_text': q['question_text']
                 }
                 for i, q in enumerate(room.questions)
             ]
@@ -338,8 +336,7 @@ async def handle_next_round(sid, data):
             'questions': [
                 {
                     'index': i,
-                    'question_text': q['question_text'],
-                    'category': q.get('category', '')
+                    'question_text': q['question_text']
                 }
                 for i, q in enumerate(room.questions)
             ]

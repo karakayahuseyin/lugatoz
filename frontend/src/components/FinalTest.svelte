@@ -90,12 +90,7 @@
             {i + 1}
           </span>
           <div class="flex-1">
-            <p class="font-semibold text-gray-800 mb-1">{question.question_text}</p>
-            {#if question.category}
-              <span class="text-xs bg-lime-100 text-lime-700 px-2 py-1 rounded-full">
-                {question.category}
-              </span>
-            {/if}
+            <p class="font-semibold text-gray-800">{question.question_text}</p>
           </div>
         </div>
 
