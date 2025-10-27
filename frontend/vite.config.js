@@ -3,10 +3,10 @@ import { svelte } from '@sveltejs/vite-plugin-svelte'
 
 export default defineConfig({
   plugins: [svelte()],
+  base: '/ozbilig/',
   server: {
     port: 5173,
     host: '0.0.0.0',
-    base: '/ozbilig/',
     proxy: {
       '/api': {
         target: 'http://backend:8000',
