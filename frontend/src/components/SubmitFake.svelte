@@ -46,10 +46,10 @@
   // Listen for error from backend
   socketManager.on('answer_rejected', (data) => {
     if (data.reason === 'correct_answer') {
-      // Sadece cevabı temizle, uyarı gösterme
+      notifications.info('Bu şıklara zaten eklendi! Farklı bir cevap deneyin.');
       fakeAnswer = '';
     } else if (data.reason === 'duplicate_answer') {
-      notifications.warning('Bu cevap zaten başka bir oyuncu tarafından girildi! Farklı bir cevap deneyin.');
+      notifications.info('Bu şıklara zaten eklendi! Farklı bir cevap deneyin.');
       fakeAnswer = '';
     }
   });
