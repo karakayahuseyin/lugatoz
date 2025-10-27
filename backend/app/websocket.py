@@ -210,8 +210,10 @@ async def handle_submit_vote(sid, data):
     # If everyone voted, show results
     if room.phase == GamePhase.SHOWING_RESULTS:
         # Prepare results
+        from .game_manager import normalize_answer
+
         results = {
-            'correct_answer': current_round.correct_answer,
+            'correct_answer': normalize_answer(current_round.correct_answer),  # Küçük harf
             'player_votes': [],
             'leaderboard': room.get_leaderboard()
         }
@@ -219,9 +221,9 @@ async def handle_submit_vote(sid, data):
         for player_id, player in room.players.items():
             vote_info = {
                 'player_name': player.name,
-                'voted_for': player.voted_answer,
-                'was_correct': player.voted_answer == current_round.correct_answer,
-                'fake_answer': current_round.fake_answers.get(player_id),
+                'voted_for': player.voted_answer if player.voted_answer else "",
+                'was_correct': player.voted_answer == normalize_answer(current_round.correct_answer) if player.voted_answer else False,
+                'fake_answer': current_round.fake_answers.get(player_id, ""),
                 'votes_received': sum(1 for v in current_round.votes.values()
                                      if v == current_round.fake_answers.get(player_id))
             }
