@@ -1,11 +1,14 @@
 <script>
   import { gameState, updateGameState } from '../stores/gameStore';
   import { socketManager } from '../utils/socket';
+  import Timer from './Timer.svelte';
 
   let selectedAnswer = null;
+  let timer;
+  let timeoutReached = false;
 
   function selectAnswer(answer) {
-    if ($gameState.votedAnswer) return;
+    if ($gameState.votedAnswer || timeoutReached) return;
     selectedAnswer = answer;
   }
 
@@ -19,8 +22,32 @@
       answer: selectedAnswer
     });
 
+    if (timer) timer.stop();
     updateGameState({ votedAnswer: true });
   }
+
+  function handleTimeout() {
+    timeoutReached = true;
+    // Auto-submit if user has selected something
+    if (selectedAnswer) {
+      submitVote();
+    } else {
+      alert('Süre doldu! Cevap seçmediniz, -100 puan cezası aldınız.');
+      // Submit empty to trigger penalty
+      socketManager.emit('submit_vote', {
+        answer: ''
+      });
+      updateGameState({ votedAnswer: true });
+    }
+  }
+
+  // Listen for error from backend
+  socketManager.on('vote_rejected', (data) => {
+    if (data.reason === 'own_answer') {
+      alert('Kendi yanlış cevabınızı seçemezsiniz!');
+      selectedAnswer = null;
+    }
+  });
 </script>
 
 <div class="card max-w-3xl w-full">
@@ -29,9 +56,13 @@
       <span class="bg-secondary text-white px-4 py-2 rounded-full font-semibold">
         Soru {$gameState.currentRound + 1} / {$gameState.maxRounds}
       </span>
-      <span class="text-gray-600 font-semibold">
-        OYLAMA
-      </span>
+      {#if !$gameState.votedAnswer}
+        <Timer bind:this={timer} duration={10} onTimeout={handleTimeout} />
+      {:else}
+        <span class="text-gray-600 font-semibold">
+          OYLAMA
+        </span>
+      {/if}
     </div>
 
     <div class="bg-gradient-to-r from-cyan-100 to-lime-100 p-6 rounded-xl border-2 border-cyan-300 mb-6">

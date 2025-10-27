@@ -1,9 +1,12 @@
 <script>
   import { gameState } from '../stores/gameStore';
   import { socketManager } from '../utils/socket';
+  import Timer from './Timer.svelte';
 
   let answers = {};
   let allAnswered = false;
+  let timer;
+  let isSubmitted = false;
 
   $: {
     allAnswered = Object.keys(answers).length === $gameState.finalQuestions.length &&
@@ -21,6 +24,8 @@
   }
 
   function finishGame() {
+    if (isSubmitted) return;
+
     if (!allAnswered) {
       alert('Lütfen tüm soruları cevaplayın!');
       return;
@@ -33,15 +38,46 @@
 
     // Oyunu bitir
     socketManager.emit('finish_game', {});
+    isSubmitted = true;
+    if (timer) timer.stop();
+  }
+
+  function handleTimeout() {
+    // Auto-submit all answers
+    if (isSubmitted) return;
+
+    alert('Süre doldu! Cevaplarınız otomatik olarak gönderildi.');
+
+    // Submit all answered questions
+    $gameState.finalQuestions.forEach((q, i) => {
+      if (answers[i] && answers[i].trim()) {
+        submitAnswer(i);
+      }
+    });
+
+    // Finish game
+    socketManager.emit('finish_game', {});
+    isSubmitted = true;
   }
 </script>
 
 <div class="card max-w-4xl w-full max-h-[90vh] overflow-y-auto">
   <div class="text-center mb-6 sticky top-0 bg-white pb-4 border-b">
-    <h1 class="text-4xl font-bold text-primary mb-2">Final Testi</h1>
+    <div class="flex justify-between items-start mb-2">
+      <div class="flex-1"></div>
+      <h1 class="text-4xl font-bold text-primary flex-1">Final Testi</h1>
+      <div class="flex-1 flex justify-end">
+        {#if !isSubmitted}
+          <Timer bind:this={timer} duration={120} onTimeout={handleTimeout} />
+        {/if}
+      </div>
+    </div>
     <p class="text-gray-600">Oyun boyunca öğrendiklerinizi test edin!</p>
     <p class="text-sm text-cyan-600 font-semibold mt-2">
       Her doğru cevap için +500 puan kazanacaksınız
+    </p>
+    <p class="text-xs text-yellow-600 font-semibold mt-1">
+      120 saniyeniz var!
     </p>
   </div>
 

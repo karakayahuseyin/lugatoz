@@ -7,6 +7,27 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 
+def normalize_answer(answer: str) -> str:
+    """Normalize answer for comparison"""
+    return answer.strip().lower()
+
+
+def check_answer(user_answer: str, correct_answer: str, acceptable_answers: Optional[str] = None) -> bool:
+    """Check if user answer is correct"""
+    normalized_user = normalize_answer(user_answer)
+    normalized_correct = normalize_answer(correct_answer)
+
+    if normalized_user == normalized_correct:
+        return True
+
+    # Check acceptable answers
+    if acceptable_answers:
+        acceptable_list = [normalize_answer(a) for a in acceptable_answers.split(',')]
+        return normalized_user in acceptable_list
+
+    return False
+
+
 class GamePhase(str, Enum):
     """Game phases"""
     WAITING = "waiting"
@@ -27,6 +48,8 @@ class Player:
     submitted_answer: Optional[str] = None
     voted_answer: Optional[str] = None
     final_answers: Dict[int, str] = field(default_factory=dict)
+    submit_time: Optional[float] = None  # Time when submitted fake answer
+    vote_time: Optional[float] = None  # Time when voted
 
 
 @dataclass
@@ -35,9 +58,12 @@ class Round:
     question_id: int
     question_text: str
     correct_answer: str
+    acceptable_answers: Optional[str] = None
     fake_answers: Dict[str, str] = field(default_factory=dict)  # player_id -> fake_answer
     votes: Dict[str, str] = field(default_factory=dict)  # player_id -> chosen_answer
     all_options: List[str] = field(default_factory=list)
+    start_time: Optional[float] = None  # Round start time
+    voting_start_time: Optional[float] = None  # Voting phase start time
 
 
 class GameRoom:
@@ -53,6 +79,8 @@ class GameRoom:
         self.rounds: List[Round] = []
         self.questions: List[Dict] = []
         self.created_at = time.time()
+        self.final_test_start_time: Optional[float] = None
+        self.final_test_duration = 120  # 120 seconds for final test
 
     def add_player(self, socket_id: str, name: str) -> bool:
         """Add player"""
@@ -93,19 +121,24 @@ class GameRoom:
         """Start new round"""
         if self.current_round >= len(self.questions):
             self.phase = GamePhase.FINAL_TEST
+            self.final_test_start_time = time.time()
             return
 
         question = self.questions[self.current_round]
         self.rounds.append(Round(
             question_id=question['id'],
             question_text=question['question_text'],
-            correct_answer=question['correct_answer']
+            correct_answer=question['correct_answer'],
+            acceptable_answers=question.get('acceptable_answers'),
+            start_time=time.time()
         ))
 
-        # Reset player answers
+        # Reset player answers and times
         for player in self.players.values():
             player.submitted_answer = None
             player.voted_answer = None
+            player.submit_time = None
+            player.vote_time = None
 
         self.phase = GamePhase.SUBMITTING_FAKE
 
@@ -118,8 +151,23 @@ class GameRoom:
             return False
 
         current_round = self.rounds[self.current_round]
-        current_round.fake_answers[socket_id] = fake_answer
-        self.players[socket_id].submitted_answer = fake_answer
+
+        # Normalize and check if answer is correct (prevent submitting correct answer)
+        if check_answer(fake_answer, current_round.correct_answer, current_round.acceptable_answers):
+            return False  # Cannot submit correct answer as fake
+
+        # Check time limit (20 seconds)
+        submit_time = time.time()
+        time_taken = submit_time - current_round.start_time
+
+        current_round.fake_answers[socket_id] = normalize_answer(fake_answer)
+        player = self.players[socket_id]
+        player.submitted_answer = normalize_answer(fake_answer)
+        player.submit_time = submit_time
+
+        # Penalty for taking too long (more than 20 seconds)
+        if time_taken > 20:
+            player.score -= 100  # -100 points for timeout
 
         # If all players submitted, move to voting
         if len(current_round.fake_answers) == len(self.players):
@@ -132,10 +180,11 @@ class GameRoom:
         current_round = self.rounds[self.current_round]
 
         # Mix all fake answers with correct answer
-        all_options = list(current_round.fake_answers.values()) + [current_round.correct_answer]
+        all_options = list(current_round.fake_answers.values()) + [normalize_answer(current_round.correct_answer)]
         random.shuffle(all_options)
 
         current_round.all_options = all_options
+        current_round.voting_start_time = time.time()
         self.phase = GamePhase.VOTING
 
     def submit_vote(self, socket_id: str, chosen_answer: str) -> bool:
@@ -147,8 +196,25 @@ class GameRoom:
             return False
 
         current_round = self.rounds[self.current_round]
-        current_round.votes[socket_id] = chosen_answer
-        self.players[socket_id].voted_answer = chosen_answer
+        normalized_choice = normalize_answer(chosen_answer)
+
+        # Prevent voting for own fake answer
+        player_fake_answer = current_round.fake_answers.get(socket_id)
+        if player_fake_answer and normalized_choice == player_fake_answer:
+            return False  # Cannot vote for own fake answer
+
+        # Check time limit (10 seconds)
+        vote_time = time.time()
+        time_taken = vote_time - current_round.voting_start_time
+
+        current_round.votes[socket_id] = normalized_choice
+        player = self.players[socket_id]
+        player.voted_answer = normalized_choice
+        player.vote_time = vote_time
+
+        # Penalty for taking too long (more than 10 seconds)
+        if time_taken > 10:
+            player.score -= 100  # -100 points for timeout
 
         # If all players voted, show results
         if len(current_round.votes) == len(self.players):
@@ -160,11 +226,18 @@ class GameRoom:
     def _calculate_scores(self):
         """Calculate scores"""
         current_round = self.rounds[self.current_round]
+        normalized_correct = normalize_answer(current_round.correct_answer)
 
         for player_id, player in self.players.items():
-            # Correct answer: 1000 points
-            if player.voted_answer == current_round.correct_answer:
-                player.score += 1000
+            voted = player.voted_answer
+
+            if voted:
+                # Correct answer: 1000 points
+                if voted == normalized_correct:
+                    player.score += 1000
+                else:
+                    # Wrong answer: -500 points
+                    player.score -= 500
 
             # Others choosing your fake answer: 500 points each
             fake_answer = current_round.fake_answers.get(player_id)
@@ -199,10 +272,9 @@ class GameRoom:
         for player_id, player in self.players.items():
             correct_count = 0
             for i, question in enumerate(self.questions):
-                user_answer = player.final_answers.get(i, "").strip().lower()
-                correct_answer = question['correct_answer'].strip().lower()
+                user_answer = player.final_answers.get(i, "")
 
-                if user_answer == correct_answer:
+                if check_answer(user_answer, question['correct_answer'], question.get('acceptable_answers')):
                     correct_count += 1
 
             # 500 points per correct answer

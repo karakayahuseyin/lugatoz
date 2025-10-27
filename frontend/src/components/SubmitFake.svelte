@@ -1,8 +1,11 @@
 <script>
   import { gameState, updateGameState } from '../stores/gameStore';
   import { socketManager } from '../utils/socket';
+  import Timer from './Timer.svelte';
 
   let fakeAnswer = '';
+  let timer;
+  let timeoutReached = false;
 
   function submitFakeAnswer() {
     if (!fakeAnswer.trim()) {
@@ -14,8 +17,32 @@
       answer: fakeAnswer.trim()
     });
 
+    if (timer) timer.stop();
     updateGameState({ submittedAnswer: true });
   }
+
+  function handleTimeout() {
+    timeoutReached = true;
+    // Auto-submit if user has entered something
+    if (fakeAnswer.trim()) {
+      submitFakeAnswer();
+    } else {
+      alert('Süre doldu! Cevap girmediniz, -100 puan cezası aldınız.');
+      // Submit empty to trigger penalty
+      socketManager.emit('submit_fake_answer', {
+        answer: ''
+      });
+      updateGameState({ submittedAnswer: true });
+    }
+  }
+
+  // Listen for error from backend
+  socketManager.on('answer_rejected', (data) => {
+    if (data.reason === 'correct_answer') {
+      alert('Doğru cevabı giremezsiniz! Yanlış ama inandırıcı bir cevap girmelisiniz.');
+      fakeAnswer = '';
+    }
+  });
 </script>
 
 <div class="card max-w-3xl w-full">
@@ -24,9 +51,13 @@
       <span class="bg-primary text-white px-4 py-2 rounded-full font-semibold">
         Soru {$gameState.currentRound + 1} / {$gameState.maxRounds}
       </span>
-      <span class="text-gray-600">
-        {$gameState.players.length} Oyuncu
-      </span>
+      {#if !$gameState.submittedAnswer}
+        <Timer bind:this={timer} duration={20} onTimeout={handleTimeout} />
+      {:else}
+        <span class="text-gray-600">
+          {$gameState.players.length} Oyuncu
+        </span>
+      {/if}
     </div>
 
     <div class="bg-gradient-to-r from-cyan-100 to-lime-100 p-6 rounded-xl border-2 border-cyan-300 mb-6">

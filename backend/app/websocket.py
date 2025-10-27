@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import socketio
-from .game_manager import game_manager, GamePhase
+from .game_manager import game_manager, GamePhase, check_answer
 from .database import SessionLocal
 from .models import Question
 
@@ -92,6 +92,7 @@ async def handle_start_game(sid, data):
                 'id': q.id,
                 'question_text': q.question_text,
                 'correct_answer': q.correct_answer,
+                'acceptable_answers': q.acceptable_answers,
                 'category': q.category
             }
             for q in questions_db
@@ -132,7 +133,15 @@ async def handle_submit_fake_answer(sid, data):
     success = room.submit_fake_answer(sid, fake_answer)
 
     if not success:
-        await sio.emit('error', {'message': 'Cevap gönderilemedi!'}, room=sid)
+        # Check if it was because answer is correct
+        current_round = room.rounds[room.current_round]
+        if check_answer(fake_answer, current_round.correct_answer, current_round.acceptable_answers):
+            await sio.emit('answer_rejected', {
+                'reason': 'correct_answer',
+                'message': 'Doğru cevabı giremezsiniz!'
+            }, room=sid)
+        else:
+            await sio.emit('error', {'message': 'Cevap gönderilemedi!'}, room=sid)
         return
 
     # Confirm to player
@@ -162,7 +171,16 @@ async def handle_submit_vote(sid, data):
     success = room.submit_vote(sid, chosen_answer)
 
     if not success:
-        await sio.emit('error', {'message': 'Oy gönderilemedi!'}, room=sid)
+        # Check if trying to vote for own answer
+        current_round = room.rounds[room.current_round]
+        player_fake = current_round.fake_answers.get(sid)
+        if player_fake and chosen_answer.strip().lower() == player_fake:
+            await sio.emit('vote_rejected', {
+                'reason': 'own_answer',
+                'message': 'Kendi yanlış cevabınızı seçemezsiniz!'
+            }, room=sid)
+        else:
+            await sio.emit('error', {'message': 'Oy gönderilemedi!'}, room=sid)
         return
 
     # Confirm to player
@@ -265,12 +283,11 @@ async def handle_finish_game(sid, data):
         await sio.emit('error', {'message': 'Oyuncu bulunamadı!'}, room=sid)
         return
 
-    # Calculate this player's final test score
+    # Calculate this player's final test score using check_answer
     correct_count = 0
     for i, question in enumerate(room.questions):
-        user_answer = player.final_answers.get(i, "").strip().lower()
-        correct_answer = question['correct_answer'].strip().lower()
-        if user_answer == correct_answer:
+        user_answer = player.final_answers.get(i, "")
+        if check_answer(user_answer, question['correct_answer'], question.get('acceptable_answers')):
             correct_count += 1
 
     # Add bonus points
