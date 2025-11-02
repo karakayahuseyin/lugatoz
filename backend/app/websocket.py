@@ -277,6 +277,40 @@ async def auto_finish_final_test(room_code):
     await show_final_results(room)
 
 
+async def auto_reset_room(room_code):
+    """Reset room to waiting state after game over"""
+    await asyncio.sleep(30)  # Wait 30 seconds
+
+    room = game_manager.get_room(room_code)
+
+    # Only reset if still in game over state
+    if room and room.phase == GamePhase.GAME_OVER:
+        # Keep players but reset game state
+        player_ids = list(room.players.keys())
+        player_names = {pid: p.name for pid, p in room.players.items()}
+        host_id = next((pid for pid, p in room.players.items() if p.is_host), None)
+
+        # Reset the room
+        game_manager.reset_room(room_code)
+
+        # Re-add players
+        room = game_manager.get_room(room_code)
+        for pid in player_ids:
+            room.players[pid] = Player(
+                socket_id=pid,
+                name=player_names[pid],
+                is_host=(pid == host_id)
+            )
+
+        # Notify all players
+        await sio.emit('room_ready_for_new_game', {
+            'message': 'Oda yeni oyun için hazır!',
+            'room_state': room.to_dict()
+        }, room=room_code)
+
+        print(f"Room {room_code} reset to WAITING with same players")
+
+
 @sio.on('next_round')
 async def handle_next_round(sid, data):
     """Move to next round"""
@@ -396,6 +430,9 @@ async def show_final_results(room):
             for q in room.questions
         ]
     }, room=room.room_code)
+
+    # After 30 seconds, reset the room to WAITING state for new game
+    asyncio.create_task(auto_reset_room(room.room_code))
 
 
 @sio.on('finish_game')

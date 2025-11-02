@@ -114,6 +114,19 @@
         });
       });
 
+      socket.on('room_ready_for_new_game', (data) => {
+        updateGameState({
+          phase: 'lobby',
+          players: data.room_state.players,
+          currentRound: 0,
+          submittedAnswer: false,
+          votedAnswer: false,
+          results: null,
+          finalQuestions: []
+        });
+        notifications.success(data.message);
+      });
+
       socket.on('error', (data) => {
         setError(data.message);
       });
