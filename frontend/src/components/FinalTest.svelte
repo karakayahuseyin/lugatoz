@@ -41,6 +41,7 @@
     socketManager.emit('finish_game', {});
     isSubmitted = true;
     if (timer) timer.stop();
+    notifications.success('Cevaplarınız gönderildi! Diğer oyuncular bekleniyor...');
   }
 
   function handleTimeout() {
@@ -105,18 +106,30 @@
   </div>
 
   <div class="sticky bottom-0 bg-white pt-4 border-t">
-    <button
-      on:click={finishGame}
-      disabled={!allAnswered}
-      class="btn btn-success w-full text-xl py-4 {!allAnswered ? 'opacity-50 cursor-not-allowed' : ''}"
-    >
-      Testi Bitir ve Sonuçları Gör
-    </button>
+    {#if isSubmitted}
+      <div class="bg-cyan-50 border-2 border-cyan-300 rounded-lg p-6 text-center">
+        <div class="text-4xl mb-3">⏳</div>
+        <p class="text-cyan-800 font-semibold text-lg mb-1">
+          Cevaplarınız gönderildi!
+        </p>
+        <p class="text-cyan-600 text-sm">
+          Diğer oyuncuların testlerini bitirmesi bekleniyor...
+        </p>
+      </div>
+    {:else}
+      <button
+        on:click={finishGame}
+        disabled={!allAnswered}
+        class="btn btn-success w-full text-xl py-4 {!allAnswered ? 'opacity-50 cursor-not-allowed' : ''}"
+      >
+        Testi Bitir ve Sonuçları Gör
+      </button>
 
-    {#if !allAnswered}
-      <p class="text-center text-gray-500 text-sm mt-2">
-        Devam etmek için tüm soruları cevaplayın ({Object.keys(answers).length}/{$gameState.finalQuestions.length})
-      </p>
+      {#if !allAnswered}
+        <p class="text-center text-gray-500 text-sm mt-2">
+          Devam etmek için tüm soruları cevaplayın ({Object.keys(answers).length}/{$gameState.finalQuestions.length})
+        </p>
+      {/if}
     {/if}
   </div>
 </div>

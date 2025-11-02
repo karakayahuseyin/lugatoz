@@ -390,14 +390,25 @@ async def handle_submit_final_answer(sid, data):
 async def show_final_results(room):
     """Calculate and show final results to all players"""
     final_scores = {}
+    player_answers = {}
 
     # Calculate scores for all players
     for player_id, player in room.players.items():
         correct_count = 0
+        answers_detail = []
+
         for i, question in enumerate(room.questions):
             user_answer = player.final_answers.get(i, "")
-            if check_answer(user_answer, question['correct_answer'], question.get('acceptable_answers')):
+            is_correct = check_answer(user_answer, question['correct_answer'], question.get('acceptable_answers'))
+
+            if is_correct:
                 correct_count += 1
+
+            answers_detail.append({
+                'question_index': i,
+                'user_answer': user_answer,
+                'is_correct': is_correct
+            })
 
         # Add bonus points
         bonus_score = correct_count * 500
@@ -409,11 +420,14 @@ async def show_final_results(room):
             'total_score': player.score
         }
 
+        player_answers[player_id] = answers_detail
+
     room.phase = GamePhase.GAME_OVER
 
     # Send results to all players
     await sio.emit('game_over', {
         'final_scores': final_scores,
+        'player_answers': player_answers,
         'leaderboard': room.get_leaderboard(),
         'questions_summary': [
             {

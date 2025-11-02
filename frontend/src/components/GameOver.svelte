@@ -6,6 +6,7 @@
   }
 
   $: winner = $gameState.leaderboard?.[0];
+  $: myAnswers = $gameState.playerId ? $gameState.results?.player_answers?.[$gameState.playerId] : null;
 </script>
 
 <div class="card max-w-4xl w-full">
@@ -51,25 +52,35 @@
     </div>
   </div>
 
-  {#if $gameState.results?.questions_summary}
+  {#if myAnswers && $gameState.results?.questions_summary}
     <div class="mb-6">
-      <details class="bg-gray-50 p-4 rounded-lg border-2 border-gray-200">
-        <summary class="cursor-pointer font-semibold text-gray-700 text-lg">
-          Soruların Doğru Cevapları
-        </summary>
-        <div class="mt-4 space-y-3">
-          {#each $gameState.results.questions_summary as q, i}
-            <div class="bg-white p-3 rounded-lg border border-gray-200">
-              <p class="font-semibold text-gray-800 mb-1">
-                {i + 1}. {q.question}
-              </p>
-              <p class="text-green-700 font-semibold">
-                ✓ {q.correct_answer}
-              </p>
+      <h3 class="font-semibold text-gray-700 mb-4 text-xl">Final Test Sonuçlarınız</h3>
+      <div class="space-y-3 bg-gray-50 p-4 rounded-lg border-2 border-gray-200">
+        {#each $gameState.results.questions_summary as q, i}
+          {@const myAnswer = myAnswers.find(a => a.question_index === i)}
+          <div class="bg-white p-4 rounded-lg border-2 {myAnswer?.is_correct ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}">
+            <p class="font-semibold text-gray-800 mb-2">
+              {i + 1}. {q.question}
+            </p>
+            <div class="space-y-1">
+              {#if myAnswer?.user_answer}
+                <p class="text-sm {myAnswer.is_correct ? 'text-green-700' : 'text-red-700'} font-semibold">
+                  {myAnswer.is_correct ? '✓' : '✗'} Cevabınız: {myAnswer.user_answer}
+                </p>
+              {:else}
+                <p class="text-sm text-gray-500 italic">
+                  Cevap vermediniz
+                </p>
+              {/if}
+              {#if !myAnswer?.is_correct}
+                <p class="text-sm text-green-700 font-semibold">
+                  ✓ Doğru cevap: {q.correct_answer}
+                </p>
+              {/if}
             </div>
-          {/each}
-        </div>
-      </details>
+          </div>
+        {/each}
+      </div>
     </div>
   {/if}
 
