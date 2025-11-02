@@ -260,7 +260,49 @@ async def handle_submit_vote(sid, data):
 
         await sio.emit('round_results', results, room=room.room_code)
 
+        # Auto proceed to next round after 10 seconds
+        asyncio.create_task(auto_next_round(room.room_code))
 
+
+
+async def auto_next_round(room_code):
+    """Automatically proceed to next round after 10 seconds"""
+    await asyncio.sleep(10)  # Wait 10 seconds
+
+    room = game_manager.get_room(room_code)
+
+    # Check if we're still in showing results (in case manually advanced)
+    if room.phase != GamePhase.SHOWING_RESULTS:
+        return
+
+    # Move to next round
+    room.next_round()
+
+    if room.phase == GamePhase.FINAL_TEST:
+        # Send the same questions that were played during the game
+        await sio.emit('final_test_phase', {
+            'questions': [
+                {
+                    'index': i,
+                    'question_text': room.questions[i]['question_text']
+                }
+                for i in range(len(room.questions))
+            ]
+        }, room=room_code)
+
+        # Start timeout for final test (120 seconds)
+        asyncio.create_task(auto_finish_final_test(room_code))
+    else:
+        # New round
+        current_round = room.rounds[room.current_round]
+        await sio.emit('new_round', {
+            'room_state': room.to_dict(),
+            'question': {
+                'round': room.current_round + 1,
+                'total_rounds': room.max_rounds,
+                'text': current_round.question_text
+            }
+        }, room=room_code)
 
 
 async def auto_finish_final_test(room_code):
@@ -313,41 +355,9 @@ async def auto_reset_room(room_code):
 
 @sio.on('next_round')
 async def handle_next_round(sid, data):
-    """Move to next round"""
-    room = get_player_room(sid)
-
-    # Only host can proceed
-    if not room.players.get(sid) or not room.players[sid].is_host:
-        await sio.emit('error', {'message': 'Sadece oyun yöneticisi devam edebilir!'}, room=sid)
-        return
-
-    room.next_round()
-
-    if room.phase == GamePhase.FINAL_TEST:
-        # Send the same questions that were played during the game
-        await sio.emit('final_test_phase', {
-            'questions': [
-                {
-                    'index': i,
-                    'question_text': room.questions[i]['question_text']
-                }
-                for i in range(len(room.questions))
-            ]
-        }, room=room.room_code)
-
-        # Start timeout for final test (120 seconds)
-        asyncio.create_task(auto_finish_final_test(room.room_code))
-    else:
-        # New round
-        current_round = room.rounds[room.current_round]
-        await sio.emit('new_round', {
-            'room_state': room.to_dict(),
-            'question': {
-                'round': room.current_round + 1,
-                'total_rounds': room.max_rounds,
-                'text': current_round.question_text
-            }
-        }, room=room.room_code)
+    """Move to next round - DISABLED: Now handled automatically by auto_next_round"""
+    # This event is ignored - round progression is automatic after 10 seconds
+    pass
 
 
 @sio.on('submit_final_answer')

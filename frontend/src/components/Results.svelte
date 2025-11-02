@@ -1,24 +1,15 @@
 <script>
   import { gameState } from '../stores/gameStore';
-  import { socketManager } from '../utils/socket';
   import Timer from './Timer.svelte';
 
   let timer;
 
-  function nextRound() {
-    if (timer) timer.stop();
-    socketManager.emit('next_round', {});
-  }
-
   function handleTimeout() {
-    // Auto proceed for everyone (host will send the event)
-    if ($gameState.isHost) {
-      nextRound();
-    }
+    // Timer finished - backend will automatically proceed to next round
+    // No action needed from frontend
   }
 
-  // Auto proceed when timer finishes, regardless of host button click
-  // Timer is shared for all players
+  // Timer is only visual - backend handles auto-progression after 10 seconds
 </script>
 
 <div class="card max-w-4xl w-full">
