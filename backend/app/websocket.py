@@ -278,14 +278,14 @@ async def auto_next_round(room_code, round_number):
     room.next_round()
 
     if room.phase == GamePhase.FINAL_TEST:
-        # Move to final test - only show questions that were actually played
+        # Send the same questions that were played during the game
         await sio.emit('final_test_phase', {
             'questions': [
                 {
                     'index': i,
-                    'question_text': room.rounds[i].question_text
+                    'question_text': room.questions[i]['question_text']
                 }
-                for i in range(len(room.rounds))
+                for i in range(len(room.questions))
             ]
         }, room=room_code)
 
@@ -331,14 +331,14 @@ async def handle_next_round(sid, data):
     room.next_round()
 
     if room.phase == GamePhase.FINAL_TEST:
-        # Move to final test - only show questions that were actually played
+        # Send the same questions that were played during the game
         await sio.emit('final_test_phase', {
             'questions': [
                 {
                     'index': i,
-                    'question_text': room.rounds[i].question_text
+                    'question_text': room.questions[i]['question_text']
                 }
-                for i in range(len(room.rounds))
+                for i in range(len(room.questions))
             ]
         }, room=room.room_code)
 
@@ -392,14 +392,14 @@ async def show_final_results(room):
     final_scores = {}
     player_answers = {}
 
-    # Calculate scores for all players - only for questions that were actually played
+    # Calculate scores for all players using room.questions (same list used throughout game)
     for player_id, player in room.players.items():
         correct_count = 0
         answers_detail = []
 
-        for i, round_data in enumerate(room.rounds):
+        for i, question in enumerate(room.questions):
             user_answer = player.final_answers.get(i, "")
-            is_correct = check_answer(user_answer, round_data.correct_answer, round_data.acceptable_answers)
+            is_correct = check_answer(user_answer, question['correct_answer'], question.get('acceptable_answers'))
 
             if is_correct:
                 correct_count += 1
@@ -424,17 +424,17 @@ async def show_final_results(room):
 
     room.phase = GamePhase.GAME_OVER
 
-    # Send results to all players - only questions that were actually played
+    # Send results with the same questions list
     await sio.emit('game_over', {
         'final_scores': final_scores,
         'player_answers': player_answers,
         'leaderboard': room.get_leaderboard(),
         'questions_summary': [
             {
-                'question': round_data.question_text,
-                'correct_answer': round_data.correct_answer
+                'question': q['question_text'],
+                'correct_answer': q['correct_answer']
             }
-            for round_data in room.rounds
+            for q in room.questions
         ]
     }, room=room.room_code)
 

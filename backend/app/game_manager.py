@@ -111,6 +111,7 @@ class GameRoom:
         if len(self.players) < 2:
             return False
 
+        # Always select exactly max_rounds (10) questions
         self.questions = random.sample(questions, min(self.max_rounds, len(questions)))
         self.phase = GamePhase.SUBMITTING_FAKE
         self.current_round = 0
