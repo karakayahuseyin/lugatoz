@@ -33,7 +33,7 @@
     }
 
     // Tüm cevapları gönder
-    $gameState.finalQuestions.forEach((q, i) => {
+    $gameState.finalQuestions.forEach((_q, i) => {
       submitAnswer(i);
     });
 
@@ -51,7 +51,7 @@
     notifications.info('Süre doldu! Cevaplarınız otomatik olarak gönderildi.');
 
     // Submit all answered questions
-    $gameState.finalQuestions.forEach((q, i) => {
+    $gameState.finalQuestions.forEach((_q, i) => {
       if (answers[i] && answers[i].trim()) {
         submitAnswer(i);
       }
