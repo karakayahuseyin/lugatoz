@@ -31,6 +31,12 @@
     <p class="text-3xl font-bold text-cyan-800 text-center">
       {$gameState.results?.correct_answer}
     </p>
+    {#if $gameState.results?.acceptable_answers}
+      <p class="text-center text-gray-600 mt-3 text-sm font-semibold">Kabul Edilebilir Cevaplar:</p>
+      <p class="text-lg text-cyan-700 text-center">
+        {$gameState.results.acceptable_answers}
+      </p>
+    {/if}
   </div>
 
   <div class="mb-6">

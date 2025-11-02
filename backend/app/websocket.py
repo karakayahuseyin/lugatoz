@@ -243,6 +243,7 @@ async def handle_submit_vote(sid, data):
 
         results = {
             'correct_answer': normalize_answer(current_round.correct_answer),  # Küçük harf
+            'acceptable_answers': current_round.acceptable_answers if current_round.acceptable_answers else None,
             'player_votes': [],
             'leaderboard': room.get_leaderboard()
         }
@@ -435,7 +436,8 @@ async def show_final_results(room):
         'questions_summary': [
             {
                 'question': q['question_text'],
-                'correct_answer': q['correct_answer']
+                'correct_answer': q['correct_answer'],
+                'acceptable_answers': q.get('acceptable_answers')
             }
             for q in room.questions
         ]

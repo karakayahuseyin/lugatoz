@@ -76,6 +76,11 @@
                 <p class="text-sm text-green-700 font-semibold">
                   ✓ Doğru cevap: {q.correct_answer}
                 </p>
+                {#if q.acceptable_answers}
+                  <p class="text-xs text-green-600">
+                    Kabul edilebilir cevaplar: {q.acceptable_answers}
+                  </p>
+                {/if}
               {/if}
             </div>
           </div>
