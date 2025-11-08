@@ -343,7 +343,8 @@ class GameRoom:
 
     def add_reaction(self, player_id: str, answer: str, emoji: str) -> bool:
         """Add emoji reaction to an answer"""
-        if self.phase != GamePhase.SHOWING_RESULTS:
+        # Allow reactions during voting phase
+        if self.phase != GamePhase.VOTING:
             return False
 
         current_round = self.rounds[self.current_round]

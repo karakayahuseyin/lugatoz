@@ -6,8 +6,8 @@
 
   const dispatch = createEventDispatcher();
 
-  // 6 most common emojis
-  const emojis = ['😂', '❤️', '👍', '🔥', '😮', '🤔'];
+  // 8 most common emojis
+  const emojis = ['😂', '❤️', '👍', '🔥', '😮', '🤔', '👏', '💯'];
 
   function selectEmoji(emoji) {
     dispatch('select', { answer, emoji });

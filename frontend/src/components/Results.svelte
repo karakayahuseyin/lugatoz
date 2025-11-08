@@ -1,44 +1,14 @@
 <script>
   import { gameState } from '../stores/gameStore';
-  import { socketManager } from '../utils/socket';
   import Timer from './Timer.svelte';
-  import EmojiPicker from './EmojiPicker.svelte';
   import { getPlayerColor } from '../utils/colors';
-  import { onMount } from 'svelte';
 
   let timer;
-  let showEmojiPicker = {};
-  let reactions = {};
 
   function handleTimeout() {
     // Timer finished - backend will automatically proceed to next round
     // No action needed from frontend
   }
-
-  function toggleEmojiPicker(answer) {
-    showEmojiPicker = {
-      ...showEmojiPicker,
-      [answer]: !showEmojiPicker[answer]
-    };
-  }
-
-  function handleEmojiSelect(event) {
-    const { answer, emoji } = event.detail;
-    socketManager.emit('add_reaction', { answer, emoji });
-    showEmojiPicker[answer] = false;
-  }
-
-  onMount(() => {
-    // Listen for reaction updates
-    const socket = socketManager.getSocket();
-    socket.on('reaction_added', (data) => {
-      reactions = data.all_reactions;
-    });
-
-    return () => {
-      socket.off('reaction_added');
-    };
-  });
 
   // Timer is only visual - backend handles auto-progression after 10 seconds
 </script>
@@ -98,44 +68,17 @@
             </div>
 
             {#if vote.fake_answer}
-              <div class="space-y-2">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <span class="text-gray-600">Yanıltıcı cevabı:</span>
-                  <span class="font-semibold text-cyan-700">"{vote.fake_answer}"</span>
-                  {#if vote.votes_received > 0}
-                    <span class="bg-purple-500 text-white text-xs px-2 py-1 rounded-full font-bold">
-                      {vote.votes_received} kişi kandı! (+{vote.votes_received * 500} puan)
-                    </span>
-                  {:else}
-                    <span class="bg-gray-400 text-white text-xs px-2 py-1 rounded-full">
-                      Kimseyi kandıramadı
-                    </span>
-                  {/if}
-                  <button
-                    on:click={() => toggleEmojiPicker(vote.fake_answer)}
-                    class="text-gray-500 hover:text-gray-700 text-sm"
-                    type="button"
-                  >
-                    😊 Tepki
-                  </button>
-                </div>
-
-                <!-- Emoji Picker -->
-                <div class="relative">
-                  <EmojiPicker
-                    answer={vote.fake_answer}
-                    show={showEmojiPicker[vote.fake_answer]}
-                    on:select={handleEmojiSelect}
-                  />
-                </div>
-
-                <!-- Show reactions -->
-                {#if reactions[vote.fake_answer?.toLowerCase()]}
-                  <div class="flex gap-1 flex-wrap">
-                    {#each Object.entries(reactions[vote.fake_answer.toLowerCase()]) as [playerId, emoji]}
-                      <span class="text-lg">{emoji}</span>
-                    {/each}
-                  </div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-gray-600">Yanıltıcı cevabı:</span>
+                <span class="font-semibold text-cyan-700">"{vote.fake_answer}"</span>
+                {#if vote.votes_received > 0}
+                  <span class="bg-purple-500 text-white text-xs px-2 py-1 rounded-full font-bold">
+                    {vote.votes_received} kişi kandı! (+{vote.votes_received * 500} puan)
+                  </span>
+                {:else}
+                  <span class="bg-gray-400 text-white text-xs px-2 py-1 rounded-full">
+                    Kimseyi kandıramadı
+                  </span>
                 {/if}
               </div>
             {/if}
