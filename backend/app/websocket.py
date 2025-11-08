@@ -161,11 +161,19 @@ async def handle_start_game(sid, data):
             ).first()
 
             if not question_stat:
-                question_stat = QuestionStats(question_id=q['id'])
+                question_stat = QuestionStats(
+                    question_id=q['id'],
+                    times_asked=0,
+                    times_correct=0,
+                    times_wrong=0,
+                    total_players_seen=0,
+                    games_used=0
+                )
                 db.add(question_stat)
+                db.flush()  # Flush to get default values
 
-            question_stat.games_used += 1
-            question_stat.total_players_seen += len(room.players)
+            question_stat.games_used = (question_stat.games_used or 0) + 1
+            question_stat.total_players_seen = (question_stat.total_players_seen or 0) + len(room.players)
             question_stat.last_used = datetime.utcnow()
 
         db.commit()
@@ -507,11 +515,11 @@ async def show_final_results(room):
                     ).first()
 
                     if question_stat:
-                        question_stat.times_asked += 1
+                        question_stat.times_asked = (question_stat.times_asked or 0) + 1
                         if answer['is_correct']:
-                            question_stat.times_correct += 1
+                            question_stat.times_correct = (question_stat.times_correct or 0) + 1
                         else:
-                            question_stat.times_wrong += 1
+                            question_stat.times_wrong = (question_stat.times_wrong or 0) + 1
 
             db.commit()
     finally:
