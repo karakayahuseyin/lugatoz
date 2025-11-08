@@ -4,7 +4,8 @@ import asyncio
 from typing import Dict
 from .game_manager import game_manager, GamePhase, check_answer
 from .database import SessionLocal
-from .models import Question
+from .models import Question, GameStats, QuestionStats
+from datetime import datetime
 
 # Create Socket.IO server
 sio = socketio.AsyncServer(
@@ -144,6 +145,33 @@ async def handle_start_game(sid, data):
         await sio.emit('error', {'message': 'Oyun başlatılamadı! En az 2 oyuncu gerekli.'}, room=sid)
         return
 
+    # Update game statistics and question statistics
+    db = SessionLocal()
+    try:
+        # Update global stats
+        stats = db.query(GameStats).first()
+        if stats:
+            stats.total_sessions += 1
+            db.commit()
+
+        # Update question statistics for selected questions
+        for q in room.questions:
+            question_stat = db.query(QuestionStats).filter(
+                QuestionStats.question_id == q['id']
+            ).first()
+
+            if not question_stat:
+                question_stat = QuestionStats(question_id=q['id'])
+                db.add(question_stat)
+
+            question_stat.games_used += 1
+            question_stat.total_players_seen += len(room.players)
+            question_stat.last_used = datetime.utcnow()
+
+        db.commit()
+    finally:
+        db.close()
+
     # Notify all players
     current_round = room.rounds[room.current_round]
     await sio.emit('game_started', {
@@ -265,6 +293,30 @@ async def handle_submit_vote(sid, data):
         asyncio.create_task(auto_next_round(room.room_code))
 
 
+@sio.on('add_reaction')
+async def handle_add_reaction(sid, data):
+    """Add emoji reaction to an answer"""
+    answer = data.get('answer', '').strip()
+    emoji = data.get('emoji', '')
+    room = get_player_room(sid)
+
+    if not answer or not emoji:
+        return
+
+    success = room.add_reaction(sid, answer, emoji)
+
+    if success:
+        # Broadcast reaction to all players
+        current_round = room.rounds[room.current_round]
+        await sio.emit('reaction_added', {
+            'player_id': sid,
+            'player_name': room.players[sid].name,
+            'answer': answer,
+            'emoji': emoji,
+            'all_reactions': current_round.reactions
+        }, room=room.room_code)
+
+
 
 async def auto_next_round(room_code):
     """Automatically proceed to next round after 10 seconds"""
@@ -331,18 +383,20 @@ async def auto_reset_room(room_code):
         # Keep players but reset game state
         player_ids = list(room.players.keys())
         player_names = {pid: p.name for pid, p in room.players.items()}
+        player_colors = {pid: p.color for pid, p in room.players.items()}
         host_id = next((pid for pid, p in room.players.items() if p.is_host), None)
 
         # Reset the room
         game_manager.reset_room(room_code)
 
-        # Re-add players
+        # Re-add players with same colors
         room = game_manager.get_room(room_code)
         for pid in player_ids:
             room.players[pid] = Player(
                 socket_id=pid,
                 name=player_names[pid],
-                is_host=(pid == host_id)
+                is_host=(pid == host_id),
+                color=player_colors[pid]
             )
 
         # Notify all players
@@ -427,6 +481,41 @@ async def show_final_results(room):
         player_answers[player_id] = answers_detail
 
     room.phase = GamePhase.GAME_OVER
+
+    # Update game statistics and question statistics
+    db = SessionLocal()
+    try:
+        stats = db.query(GameStats).first()
+        if stats:
+            stats.completed_sessions += 1
+            stats.total_players += len(room.players)
+
+            # Count total questions answered and correct/wrong
+            for player_id in room.players:
+                answers = player_answers[player_id]
+                stats.total_questions_answered += len(answers)
+                for i, answer in enumerate(answers):
+                    if answer['is_correct']:
+                        stats.total_correct_answers += 1
+                    else:
+                        stats.total_wrong_answers += 1
+
+                    # Update question-specific stats
+                    question_id = room.questions[i]['id']
+                    question_stat = db.query(QuestionStats).filter(
+                        QuestionStats.question_id == question_id
+                    ).first()
+
+                    if question_stat:
+                        question_stat.times_asked += 1
+                        if answer['is_correct']:
+                            question_stat.times_correct += 1
+                        else:
+                            question_stat.times_wrong += 1
+
+            db.commit()
+    finally:
+        db.close()
 
     # Send results with the same questions list
     await sio.emit('game_over', {

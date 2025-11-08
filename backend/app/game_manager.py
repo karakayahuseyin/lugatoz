@@ -45,6 +45,7 @@ class Player:
     name: str
     score: int = 0
     is_host: bool = False
+    color: str = "blue"  # Player color: blue, red, orange, green
     submitted_answer: Optional[str] = None
     voted_answer: Optional[str] = None
     final_answers: Dict[int, str] = field(default_factory=dict)
@@ -64,6 +65,8 @@ class Round:
     all_options: List[str] = field(default_factory=list)
     start_time: Optional[float] = None  # Round start time
     voting_start_time: Optional[float] = None  # Voting phase start time
+    # Emoji reactions: answer -> {player_id -> emoji}
+    reactions: Dict[str, Dict[str, str]] = field(default_factory=dict)
 
 
 class GameRoom:
@@ -87,11 +90,16 @@ class GameRoom:
         if len(self.players) >= self.max_players:
             return False
 
+        # Assign colors cyclically: blue, red, orange, green
+        colors = ["blue", "red", "orange", "green"]
+        player_color = colors[len(self.players) % len(colors)]
+
         is_host = len(self.players) == 0
         self.players[socket_id] = Player(
             socket_id=socket_id,
             name=name,
-            is_host=is_host
+            is_host=is_host,
+            color=player_color
         )
         return True
 
@@ -333,6 +341,24 @@ class GameRoom:
         self.phase = GamePhase.GAME_OVER
         return scores
 
+    def add_reaction(self, player_id: str, answer: str, emoji: str) -> bool:
+        """Add emoji reaction to an answer"""
+        if self.phase != GamePhase.SHOWING_RESULTS:
+            return False
+
+        current_round = self.rounds[self.current_round]
+
+        # Normalize answer for matching
+        normalized_answer = normalize_answer(answer)
+
+        # Initialize reactions dict for this answer if needed
+        if normalized_answer not in current_round.reactions:
+            current_round.reactions[normalized_answer] = {}
+
+        # Add or update player's reaction
+        current_round.reactions[normalized_answer][player_id] = emoji
+        return True
+
     def get_leaderboard(self) -> List[Dict]:
         """Get leaderboard"""
         sorted_players = sorted(
@@ -345,7 +371,8 @@ class GameRoom:
             {
                 'name': player.name,
                 'score': player.score,
-                'socket_id': player.socket_id
+                'socket_id': player.socket_id,
+                'color': player.color
             }
             for player in sorted_players
         ]
@@ -364,7 +391,8 @@ class GameRoom:
                     'socket_id': p.socket_id,
                     'name': p.name,
                     'score': p.score,
-                    'is_host': p.is_host
+                    'is_host': p.is_host,
+                    'color': p.color
                 }
                 for p in self.players.values()
             ]

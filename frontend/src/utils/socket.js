@@ -63,6 +63,10 @@ class SocketManager {
       this.socket.off(event, callback);
     }
   }
+
+  getSocket() {
+    return this.socket;
+  }
 }
 
 export const socketManager = new SocketManager();

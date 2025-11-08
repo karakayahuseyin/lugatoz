@@ -6,6 +6,7 @@
   let editingQuestion = null;
   let isAuthenticated = false;
   let passwordInput = '';
+  let stats = null;
 
   const ADMIN_PASSWORD = 'lugatoz23';
 
@@ -19,6 +20,7 @@
     if (passwordInput === ADMIN_PASSWORD) {
       isAuthenticated = true;
       loadQuestions();
+      loadStats();
     } else {
       alert('Yanlış şifre!');
       passwordInput = '';
@@ -36,6 +38,15 @@
     } catch (error) {
       console.error('Sorular yüklenemedi:', error);
       alert('Sorular yüklenemedi! Backend bağlantısını kontrol edin.');
+    }
+  }
+
+  async function loadStats() {
+    try {
+      const response = await fetch('/api/stats');
+      stats = await response.json();
+    } catch (error) {
+      console.error('İstatistikler yüklenemedi:', error);
     }
   }
 
@@ -180,6 +191,55 @@
             Oyuna Dön
           </a>
         </div>
+
+      <!-- İstatistikler -->
+      {#if stats}
+        <div class="bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-lg border-2 border-purple-200 mb-6">
+          <h2 class="text-2xl font-bold text-purple-800 mb-4">Oyun İstatistikleri</h2>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-white p-4 rounded-lg shadow">
+              <p class="text-gray-600 text-sm font-semibold">Toplam Oyuncu</p>
+              <p class="text-3xl font-bold text-purple-700">{stats.total_players}</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+              <p class="text-gray-600 text-sm font-semibold">Toplam Oturum</p>
+              <p class="text-3xl font-bold text-blue-700">{stats.total_sessions}</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+              <p class="text-gray-600 text-sm font-semibold">Tamamlanan Oyun</p>
+              <p class="text-3xl font-bold text-cyan-700">{stats.completed_sessions}</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+              <p class="text-gray-600 text-sm font-semibold">Cevaplanan Soru</p>
+              <p class="text-3xl font-bold text-lime-700">{stats.total_questions_answered}</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+              <p class="text-gray-600 text-sm font-semibold">Doğru Cevap</p>
+              <p class="text-3xl font-bold text-green-700">{stats.total_correct_answers}</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+              <p class="text-gray-600 text-sm font-semibold">Yanlış Cevap</p>
+              <p class="text-3xl font-bold text-red-700">{stats.total_wrong_answers}</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+              <p class="text-gray-600 text-sm font-semibold">Başarı Oranı</p>
+              <p class="text-3xl font-bold text-yellow-700">
+                {stats.total_questions_answered > 0
+                  ? ((stats.total_correct_answers / stats.total_questions_answered) * 100).toFixed(1)
+                  : 0}%
+              </p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+              <p class="text-gray-600 text-sm font-semibold">Ort. Oyuncu/Oyun</p>
+              <p class="text-3xl font-bold text-indigo-700">
+                {stats.completed_sessions > 0
+                  ? (stats.total_players / stats.completed_sessions).toFixed(1)
+                  : 0}
+              </p>
+            </div>
+          </div>
+        </div>
+      {/if}
 
       <div class="grid grid-cols-2 gap-4 mb-6">
         <div class="bg-cyan-50 p-4 rounded-lg border-2 border-cyan-200">
@@ -358,10 +418,30 @@
                 </div>
               </div>
 
-              <div class="flex gap-2">
+              <div class="flex gap-2 flex-wrap">
                 <span class="text-xs {question.is_active ? 'bg-cyan-100 text-cyan-700' : 'bg-red-100 text-red-700'} px-2 py-1 rounded-full">
                   {question.is_active ? 'Aktif' : 'Pasif'}
                 </span>
+                {#if question.stats}
+                  <span class="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                    {question.stats.games_used} oyunda kullanıldı
+                  </span>
+                  <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                    {question.stats.times_asked} kez soruldu
+                  </span>
+                  <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                    ✓ {question.stats.times_correct} doğru
+                  </span>
+                  <span class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">
+                    ✗ {question.stats.times_wrong} yanlış
+                  </span>
+                  <span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">
+                    %{question.stats.success_rate.toFixed(1)} başarı
+                  </span>
+                  <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">
+                    {question.stats.total_players_seen} oyuncu gördü
+                  </span>
+                {/if}
               </div>
             </div>
           {/each}

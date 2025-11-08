@@ -1,13 +1,44 @@
 <script>
   import { gameState } from '../stores/gameStore';
+  import { socketManager } from '../utils/socket';
   import Timer from './Timer.svelte';
+  import EmojiPicker from './EmojiPicker.svelte';
+  import { getPlayerColor } from '../utils/colors';
+  import { onMount } from 'svelte';
 
   let timer;
+  let showEmojiPicker = {};
+  let reactions = {};
 
   function handleTimeout() {
     // Timer finished - backend will automatically proceed to next round
     // No action needed from frontend
   }
+
+  function toggleEmojiPicker(answer) {
+    showEmojiPicker = {
+      ...showEmojiPicker,
+      [answer]: !showEmojiPicker[answer]
+    };
+  }
+
+  function handleEmojiSelect(event) {
+    const { answer, emoji } = event.detail;
+    socketManager.emit('add_reaction', { answer, emoji });
+    showEmojiPicker[answer] = false;
+  }
+
+  onMount(() => {
+    // Listen for reaction updates
+    const socket = socketManager.getSocket();
+    socket.on('reaction_added', (data) => {
+      reactions = data.all_reactions;
+    });
+
+    return () => {
+      socket.off('reaction_added');
+    };
+  });
 
   // Timer is only visual - backend handles auto-progression after 10 seconds
 </script>
@@ -67,13 +98,44 @@
             </div>
 
             {#if vote.fake_answer}
-              <div class="flex items-center gap-2">
-                <span class="text-gray-600">Yanlış cevabı:</span>
-                <span class="font-semibold text-cyan-700">"{vote.fake_answer}"</span>
-                {#if vote.votes_received > 0}
-                  <span class="bg-purple-500 text-white text-xs px-2 py-1 rounded-full font-bold">
-                    {vote.votes_received} oy (+{vote.votes_received * 500} puan)
-                  </span>
+              <div class="space-y-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-gray-600">Yanıltıcı cevabı:</span>
+                  <span class="font-semibold text-cyan-700">"{vote.fake_answer}"</span>
+                  {#if vote.votes_received > 0}
+                    <span class="bg-purple-500 text-white text-xs px-2 py-1 rounded-full font-bold">
+                      {vote.votes_received} kişi kandı! (+{vote.votes_received * 500} puan)
+                    </span>
+                  {:else}
+                    <span class="bg-gray-400 text-white text-xs px-2 py-1 rounded-full">
+                      Kimseyi kandıramadı
+                    </span>
+                  {/if}
+                  <button
+                    on:click={() => toggleEmojiPicker(vote.fake_answer)}
+                    class="text-gray-500 hover:text-gray-700 text-sm"
+                    type="button"
+                  >
+                    😊 Tepki
+                  </button>
+                </div>
+
+                <!-- Emoji Picker -->
+                <div class="relative">
+                  <EmojiPicker
+                    answer={vote.fake_answer}
+                    show={showEmojiPicker[vote.fake_answer]}
+                    on:select={handleEmojiSelect}
+                  />
+                </div>
+
+                <!-- Show reactions -->
+                {#if reactions[vote.fake_answer?.toLowerCase()]}
+                  <div class="flex gap-1 flex-wrap">
+                    {#each Object.entries(reactions[vote.fake_answer.toLowerCase()]) as [playerId, emoji]}
+                      <span class="text-lg">{emoji}</span>
+                    {/each}
+                  </div>
                 {/if}
               </div>
             {/if}
@@ -87,12 +149,8 @@
     <h3 class="font-semibold text-gray-700 mb-4 text-xl">Liderlik Tablosu:</h3>
     <div class="space-y-2">
       {#each $gameState.leaderboard as player, i}
-        <div class="flex items-center gap-4 bg-gradient-to-r {
-          i === 0 ? 'from-yellow-100 to-yellow-200 border-lime-400' :
-          i === 1 ? 'from-gray-100 to-gray-200 border-gray-400' :
-          i === 2 ? 'from-lime-100 to-lime-200 border-lime-400' :
-          'from-gray-50 to-gray-100 border-gray-300'
-        } border-2 p-4 rounded-lg">
+        {@const colors = getPlayerColor(player.color)}
+        <div class="flex items-center gap-4 bg-gradient-to-r {colors.gradient} border-2 {colors.border} p-4 rounded-lg">
           <span class="text-3xl font-bold text-gray-700 w-10">
             {#if i === 0}🥇
             {:else if i === 1}🥈
@@ -100,8 +158,8 @@
             {:else}{i + 1}.
             {/if}
           </span>
-          <span class="flex-1 font-semibold text-lg text-gray-800">{player.name}</span>
-          <span class="font-bold text-2xl text-primary">{player.score}</span>
+          <span class="flex-1 font-semibold text-lg {colors.text}">{player.name}</span>
+          <span class="font-bold text-2xl {colors.text}">{player.score}</span>
         </div>
       {/each}
     </div>

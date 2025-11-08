@@ -1,5 +1,6 @@
 <script>
   import { gameState, resetGameState } from '../stores/gameStore';
+  import { getPlayerColor } from '../utils/colors';
 
   function playAgain() {
     resetGameState();
@@ -27,12 +28,8 @@
     <h3 class="font-semibold text-gray-700 mb-4 text-2xl text-center">Final Sıralaması</h3>
     <div class="space-y-3">
       {#each $gameState.leaderboard as player, i}
-        <div class="flex items-center gap-4 bg-gradient-to-r {
-          i === 0 ? 'from-lime-100 to-lime-200 border-lime-400 scale-105' :
-          i === 1 ? 'from-gray-100 to-gray-200 border-gray-400' :
-          i === 2 ? 'from-lime-100 to-lime-200 border-lime-400' :
-          'from-gray-50 to-gray-100 border-gray-300'
-        } border-2 p-5 rounded-xl shadow-md transition-all">
+        {@const colors = getPlayerColor(player.color)}
+        <div class="flex items-center gap-4 bg-gradient-to-r {colors.gradient} border-2 {colors.border} p-5 rounded-xl shadow-md transition-all {i === 0 ? 'scale-105' : ''}">
           <span class="text-4xl w-14 text-center">
             {#if i === 0}🥇
             {:else if i === 1}🥈
@@ -40,12 +37,8 @@
             {:else}<span class="font-bold text-gray-600 text-2xl">{i + 1}.</span>
             {/if}
           </span>
-          <span class="flex-1 font-bold text-xl text-gray-800">{player.name}</span>
-          <span class="font-bold text-3xl {
-            i === 0 ? 'text-lime-600' :
-            i === 1 ? 'text-gray-600' :
-            i === 2 ? 'text-lime-600' :
-            'text-primary'
+          <span class="flex-1 font-bold text-xl {colors.text}">{player.name}</span>
+          <span class="font-bold text-3xl {colors.text
           }">{player.score}</span>
         </div>
       {/each}

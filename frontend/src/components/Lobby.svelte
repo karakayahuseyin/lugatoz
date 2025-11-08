@@ -2,6 +2,7 @@
   import { gameState } from '../stores/gameStore';
   import { socketManager } from '../utils/socket';
   import HowToPlay from './HowToPlay.svelte';
+  import { getPlayerColor } from '../utils/colors';
 
   let showHowToPlay = false;
 
@@ -26,11 +27,12 @@
     </h3>
     <div class="grid grid-cols-2 gap-3">
       {#each $gameState.players as player}
-        <div class="bg-gradient-to-r from-cyan-50 to-lime-50 p-4 rounded-lg border-2 {player.is_host ? 'border-lime-400' : 'border-cyan-200'}">
+        {@const colors = getPlayerColor(player.color)}
+        <div class="bg-gradient-to-r {colors.gradient} p-4 rounded-lg border-2 {colors.border}">
           <div class="text-center">
-            <div class="font-semibold text-gray-800">{player.name}</div>
+            <div class="font-semibold {colors.text}">{player.name}</div>
             {#if player.is_host}
-              <span class="bg-lime-400 text-lime-900 text-xs px-2 py-1 rounded-full font-bold inline-block mt-2">
+              <span class="{colors.badge} text-white text-xs px-2 py-1 rounded-full font-bold inline-block mt-2">
                 OYUN YÖNETİCİSİ
               </span>
             {/if}

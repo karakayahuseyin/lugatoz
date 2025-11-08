@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Text, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from datetime import datetime
 
 Base = declarative_base()
 
@@ -54,3 +55,37 @@ class Player(Base):
 
     def __repr__(self):
         return f"<Player(name='{self.player_name}', score={self.score})>"
+
+
+class GameStats(Base):
+    """Game statistics model"""
+    __tablename__ = "game_stats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    total_players = Column(Integer, default=0)
+    total_sessions = Column(Integer, default=0)
+    completed_sessions = Column(Integer, default=0)
+    total_questions_answered = Column(Integer, default=0)
+    total_correct_answers = Column(Integer, default=0)
+    total_wrong_answers = Column(Integer, default=0)
+    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<GameStats(sessions={self.total_sessions}, players={self.total_players})>"
+
+
+class QuestionStats(Base):
+    """Question-specific statistics model"""
+    __tablename__ = "question_stats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    question_id = Column(Integer, ForeignKey("questions.id"), nullable=False, unique=True, index=True)
+    times_asked = Column(Integer, default=0)  # Kaç defa soruldu
+    times_correct = Column(Integer, default=0)  # Kaç defa doğru cevaplandı
+    times_wrong = Column(Integer, default=0)  # Kaç defa yanlış cevaplandı
+    total_players_seen = Column(Integer, default=0)  # Kaç oyuncu gördü
+    games_used = Column(Integer, default=0)  # Kaç oyunda kullanıldı
+    last_used = Column(DateTime, nullable=True)  # Son kullanım tarihi
+
+    def __repr__(self):
+        return f"<QuestionStats(question_id={self.question_id}, asked={self.times_asked})>"
