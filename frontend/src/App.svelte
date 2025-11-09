@@ -151,6 +151,9 @@
   }
 
   function handleRoomSelect(roomCode) {
+    // Oda bilgilerini kaydet (yeniden bağlanma için)
+    socketManager.setRoomInfo(playerName, roomCode);
+
     socketManager.emit('join_game', {
       player_name: playerName,
       room_code: roomCode

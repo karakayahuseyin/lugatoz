@@ -1,8 +1,11 @@
 <script>
   import { gameState, resetGameState } from '../stores/gameStore';
   import { getPlayerColor } from '../utils/colors';
+  import { socketManager } from '../utils/socket';
 
   function playAgain() {
+    // Oda bilgilerini temizle (yeniden oyun başlatmak için)
+    socketManager.clearRoomInfo();
     resetGameState();
   }
 
