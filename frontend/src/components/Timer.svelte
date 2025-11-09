@@ -8,20 +8,30 @@
   let timeLeft = duration;
   let interval;
   let isRunning = false;
+  let startTime = null;
+  let endTime = null;
 
   export function start() {
     if (isRunning) return;
     isRunning = true;
     timeLeft = duration;
 
-    interval = setInterval(() => {
-      timeLeft--;
+    // Başlangıç ve bitiş zamanlarını kaydet
+    startTime = Date.now();
+    endTime = startTime + (duration * 1000);
 
-      if (timeLeft <= 0) {
+    // Her 100ms'de bir kontrol et (daha hassas)
+    interval = setInterval(() => {
+      const now = Date.now();
+      const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
+
+      timeLeft = remaining;
+
+      if (remaining <= 0) {
         stop();
         onTimeout();
       }
-    }, 1000);
+    }, 100); // 100ms interval for smoother updates
   }
 
   export function stop() {
@@ -30,6 +40,8 @@
       interval = null;
     }
     isRunning = false;
+    startTime = null;
+    endTime = null;
   }
 
   export function reset() {
@@ -37,13 +49,37 @@
     timeLeft = duration;
   }
 
+  // Visibility API - sayfa arka plana alındığında bile çalışır
+  function handleVisibilityChange() {
+    if (document.hidden) {
+      console.log('📱 Sayfa arka plana alındı - timer çalışmaya devam ediyor');
+    } else {
+      console.log('📱 Sayfa ön plana geldi - timer senkronize ediliyor');
+      // Ön plana geldiğinde zamanı yeniden hesapla
+      if (isRunning && endTime) {
+        const now = Date.now();
+        const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
+        timeLeft = remaining;
+
+        if (remaining <= 0) {
+          stop();
+          onTimeout();
+        }
+      }
+    }
+  }
+
   onMount(() => {
+    // Visibility API listener ekle
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     if (autoStart) {
       start();
     }
   });
 
   onDestroy(() => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
     stop();
   });
 
@@ -106,7 +142,7 @@
     fill: none;
     stroke-width: 8;
     stroke-linecap: round;
-    transition: stroke-dashoffset 1s linear, stroke 0.3s ease;
+    transition: stroke-dashoffset 0.1s linear, stroke 0.3s ease;
   }
 
   .timer-circle.normal {
