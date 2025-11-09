@@ -32,7 +32,7 @@ def init_db():
     os.makedirs("./data", exist_ok=True)
 
     Base.metadata.create_all(bind=engine)
-    print("✓ Veritabanı tabloları oluşturuldu")
+    print("Veritabani tablolari olusturuldu")
 
     # Örnek sorular ekle (eğer veritabanı boşsa)
     db = SessionLocal()
@@ -114,6 +114,6 @@ def init_db():
             ]
             db.add_all(sample_questions)
             db.commit()
-            print(f"✓ {len(sample_questions)} örnek soru eklendi")
+            print(f"{len(sample_questions)} ornek soru eklendi")
     finally:
         db.close()

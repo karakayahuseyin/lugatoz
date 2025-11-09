@@ -27,12 +27,12 @@ class SocketManager {
     });
 
     this.socket.on('connect', () => {
-      console.log('✅ Socket bağlantısı kuruldu:', this.socket.id);
+      console.log('Socket baglantisi kuruldu:', this.socket.id);
       this.connected = true;
 
-      // Eğer daha önce bir odadaysa, otomatik yeniden katıl
+      // Eger daha once bir odadaysa, otomatik yeniden katil
       if (this.lastRoomCode && this.lastPlayerName && this.isReconnecting) {
-        console.log('🔄 Odaya yeniden bağlanılıyor:', this.lastRoomCode);
+        console.log('Odaya yeniden baglaniliyor:', this.lastRoomCode);
         setTimeout(() => {
           this.socket.emit('join_game', {
             player_name: this.lastPlayerName,
@@ -44,30 +44,30 @@ class SocketManager {
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('⚠️ Socket bağlantısı kesildi:', reason);
+      console.log('Socket baglantisi kesildi:', reason);
       this.connected = false;
 
-      // Eğer sunucu kapatmadıysa (transport close veya ping timeout), yeniden bağlanma işareti
+      // Eger sunucu kapatmadiysa (transport close veya ping timeout), yeniden baglanma isareti
       if (reason === 'transport close' || reason === 'ping timeout') {
         this.isReconnecting = true;
       }
     });
 
     this.socket.on('reconnect', (attemptNumber) => {
-      console.log('🔄 Yeniden bağlanıldı! Deneme:', attemptNumber);
+      console.log('Yeniden baglandi! Deneme:', attemptNumber);
     });
 
     this.socket.on('reconnect_attempt', (attemptNumber) => {
-      console.log('🔄 Yeniden bağlanma denemesi:', attemptNumber);
+      console.log('Yeniden baglanma denemesi:', attemptNumber);
     });
 
     this.socket.on('reconnect_failed', () => {
-      console.error('❌ Yeniden bağlanma başarısız!');
+      console.error('Yeniden baglanma basarisiz!');
       this.isReconnecting = false;
     });
 
     this.socket.on('error', (error) => {
-      console.error('Socket hatası:', error);
+      console.error('Socket hatasi:', error);
     });
 
     return this.socket;

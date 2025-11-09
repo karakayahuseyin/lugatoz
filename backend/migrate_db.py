@@ -25,12 +25,12 @@ def migrate():
                 ADD COLUMN acceptable_answers TEXT
             """)
             conn.commit()
-            print("✓ Migration completed successfully!")
+            print("Migration completed successfully!")
         else:
-            print("✓ acceptable_answers column already exists. No migration needed.")
+            print("acceptable_answers column already exists. No migration needed.")
 
     except Exception as e:
-        print(f"✗ Migration failed: {e}")
+        print(f"Migration failed: {e}")
         conn.rollback()
         raise
     finally:

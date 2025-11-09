@@ -49,13 +49,13 @@
     timeLeft = duration;
   }
 
-  // Visibility API - sayfa arka plana alındığında bile çalışır
+  // Visibility API - sayfa arka plana alindiginda bile calisir
   function handleVisibilityChange() {
     if (document.hidden) {
-      console.log('📱 Sayfa arka plana alındı - timer çalışmaya devam ediyor');
+      console.log('Sayfa arka plana alindi - timer calismaya devam ediyor');
     } else {
-      console.log('📱 Sayfa ön plana geldi - timer senkronize ediliyor');
-      // Ön plana geldiğinde zamanı yeniden hesapla
+      console.log('Sayfa on plana geldi - timer senkronize ediliyor');
+      // On plana geldiginde zamani yeniden hesapla
       if (isRunning && endTime) {
         const now = Date.now();
         const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));

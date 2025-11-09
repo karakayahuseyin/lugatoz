@@ -224,9 +224,9 @@ async def get_stats(db: Session = Depends(get_db)):
 
 @app.on_event("startup")
 async def startup_event():
-    print("🚀 LügaTöz sunucusu başlatılıyor...")
+    print("LugaToz sunucusu baslatiliyor...")
     init_db()
-    # İstatistik kaydı oluştur
+    # Istatistik kaydi olustur
     from .database import SessionLocal
     db = SessionLocal()
     try:
@@ -237,7 +237,7 @@ async def startup_event():
             db.commit()
     finally:
         db.close()
-    print("✓ Sunucu hazır!")
+    print("Sunucu hazir!")
 
 
 if __name__ == "__main__":
