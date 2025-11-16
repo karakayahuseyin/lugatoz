@@ -25,7 +25,7 @@
   <div class="text-center mb-8">
     <!-- Logo -->
     <div class="mb-4 flex justify-center">
-      <img src="/lugatoz/lugatoz.png" alt="LügaTöz Logo" class="w-32 h-32 object-contain" />
+      <img src="/lugatoz.png" alt="LügaTöz Logo" class="w-32 h-32 object-contain" />
     </div>
 
     <h1 class="text-5xl font-bold text-primary mb-2">LügaTöz</h1>
