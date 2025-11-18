@@ -343,8 +343,8 @@ class GameRoom:
 
     def add_reaction(self, player_id: str, answer: str, emoji: str) -> bool:
         """Add emoji reaction to an answer"""
-        # Allow reactions during voting phase
-        if self.phase != GamePhase.VOTING:
+        # Allow reactions during voting and showing results phases
+        if self.phase not in [GamePhase.VOTING, GamePhase.SHOWING_RESULTS]:
             return False
 
         current_round = self.rounds[self.current_round]
@@ -356,8 +356,14 @@ class GameRoom:
         if normalized_answer not in current_round.reactions:
             current_round.reactions[normalized_answer] = {}
 
-        # Add or update player's reaction
-        current_round.reactions[normalized_answer][player_id] = emoji
+        # Get player name for display
+        player_name = self.players[player_id].name if player_id in self.players else "Unknown"
+
+        # Add or update player's reaction with name
+        current_round.reactions[normalized_answer][player_id] = {
+            "emoji": emoji,
+            "player_name": player_name
+        }
         return True
 
     def get_leaderboard(self) -> List[Dict]:

@@ -2,13 +2,40 @@
   import { gameState } from '../stores/gameStore';
   import Timer from './Timer.svelte';
   import { getPlayerColor } from '../utils/colors';
+  import EmojiPicker from './EmojiPicker.svelte';
+  import { socketManager } from '../utils/socket';
+  import { onMount } from 'svelte';
 
   let timer;
+  let showEmojiPicker = false;
+  let reactions = {};
 
   function handleTimeout() {
     // Timer finished - backend will automatically proceed to next round
     // No action needed from frontend
   }
+
+  function toggleEmojiPicker() {
+    showEmojiPicker = !showEmojiPicker;
+  }
+
+  function handleEmojiSelect(event) {
+    const { answer, emoji } = event.detail;
+    socketManager.emit('add_reaction', { answer, emoji });
+    showEmojiPicker = false;
+  }
+
+  onMount(() => {
+    // Listen for reaction updates
+    const socket = socketManager.getSocket();
+    socket.on('reaction_added', (data) => {
+      reactions = data.all_reactions;
+    });
+
+    return () => {
+      socket.off('reaction_added');
+    };
+  });
 
   // Timer is only visual - backend handles auto-progression after 10 seconds
 </script>
@@ -27,11 +54,44 @@
     </div>
   </div>
 
-  <div class="bg-gradient-to-r from-cyan-100 to-emerald-100 p-6 rounded-xl border-2 border-cyan-300 mb-6">
-    <p class="text-center text-gray-700 mb-2 font-semibold">Doğru Cevap:</p>
-    <p class="text-3xl font-bold text-cyan-800 text-center">
-      {$gameState.results?.correct_answer}
-    </p>
+  <div class="bg-gradient-to-r from-cyan-100 to-emerald-100 p-6 rounded-xl border-2 border-cyan-300 mb-6 relative">
+    <p class="text-center text-gray-700 mb-2 font-semibold">Dogru Cevap:</p>
+    <div class="flex items-center justify-center gap-3">
+      <p class="text-3xl font-bold text-cyan-800">
+        {$gameState.results?.correct_answer}
+      </p>
+      <button
+        on:click={toggleEmojiPicker}
+        class="text-2xl hover:scale-125 transition-transform"
+        type="button"
+        title="Tepki ekle"
+      >
+        😊
+      </button>
+    </div>
+
+    <!-- Show reactions for correct answer -->
+    {#if reactions[$gameState.results?.correct_answer?.toLowerCase()]}
+      <div class="flex gap-2 flex-wrap justify-center mt-3">
+        {#each Object.entries(reactions[$gameState.results.correct_answer.toLowerCase()]) as [_playerId, reaction]}
+          <span class="text-xl bg-white/50 px-2 py-1 rounded-lg" title={reaction.player_name || ''}>
+            {reaction.emoji || reaction} <span class="text-xs text-gray-600">{reaction.player_name || ''}</span>
+          </span>
+        {/each}
+      </div>
+    {/if}
+
+    <!-- Emoji Picker -->
+    {#if showEmojiPicker}
+      <div class="absolute top-full left-1/2 transform -translate-x-1/2 z-50 mt-1">
+        <EmojiPicker
+          answer={$gameState.results?.correct_answer}
+          show={showEmojiPicker}
+          on:select={handleEmojiSelect}
+        />
+      </div>
+    {/if}
+
     {#if $gameState.results?.acceptable_answers}
       <p class="text-center text-gray-600 mt-3 text-sm font-semibold">Kabul Edilebilir Cevaplar:</p>
       <p class="text-lg text-cyan-700 text-center">

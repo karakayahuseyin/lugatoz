@@ -147,8 +147,10 @@
               <!-- Show reactions for this option -->
               {#if reactions[option?.toLowerCase()]}
                 <div class="flex gap-1 flex-wrap mt-2 ml-11">
-                  {#each Object.entries(reactions[option.toLowerCase()]) as [_playerId, emoji]}
-                    <span class="text-xl">{emoji}</span>
+                  {#each Object.entries(reactions[option.toLowerCase()]) as [_playerId, reaction]}
+                    <span class="text-xl" title={reaction.player_name || ''}>
+                      {reaction.emoji || reaction}
+                    </span>
                   {/each}
                 </div>
               {/if}
