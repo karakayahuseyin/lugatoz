@@ -7,7 +7,7 @@
   import { onMount } from 'svelte';
 
   let timer;
-  let showEmojiPicker = false;
+  let showEmojiPicker = {};
   let reactions = {};
 
   function handleTimeout() {
@@ -15,14 +15,18 @@
     // No action needed from frontend
   }
 
-  function toggleEmojiPicker() {
-    showEmojiPicker = !showEmojiPicker;
+  function toggleEmojiPicker(playerName) {
+    showEmojiPicker = {
+      ...showEmojiPicker,
+      [playerName]: !showEmojiPicker[playerName]
+    };
   }
 
   function handleEmojiSelect(event) {
     const { answer, emoji } = event.detail;
+    // answer here is the player name
     socketManager.emit('add_reaction', { answer, emoji });
-    showEmojiPicker = false;
+    showEmojiPicker[answer] = false;
   }
 
   onMount(() => {
@@ -54,44 +58,11 @@
     </div>
   </div>
 
-  <div class="bg-gradient-to-r from-cyan-100 to-emerald-100 p-6 rounded-xl border-2 border-cyan-300 mb-6 relative">
+  <div class="bg-gradient-to-r from-cyan-100 to-emerald-100 p-6 rounded-xl border-2 border-cyan-300 mb-6">
     <p class="text-center text-gray-700 mb-2 font-semibold">Dogru Cevap:</p>
-    <div class="flex items-center justify-center gap-3">
-      <p class="text-3xl font-bold text-cyan-800">
-        {$gameState.results?.correct_answer}
-      </p>
-      <button
-        on:click={toggleEmojiPicker}
-        class="text-2xl hover:scale-125 transition-transform"
-        type="button"
-        title="Tepki ekle"
-      >
-        😊
-      </button>
-    </div>
-
-    <!-- Show reactions for correct answer -->
-    {#if reactions[$gameState.results?.correct_answer?.toLowerCase()]}
-      <div class="flex gap-2 flex-wrap justify-center mt-3">
-        {#each Object.entries(reactions[$gameState.results.correct_answer.toLowerCase()]) as [_playerId, reaction]}
-          <span class="text-xl bg-white/50 px-2 py-1 rounded-lg" title={reaction.player_name || ''}>
-            {reaction.emoji || reaction} <span class="text-xs text-gray-600">{reaction.player_name || ''}</span>
-          </span>
-        {/each}
-      </div>
-    {/if}
-
-    <!-- Emoji Picker -->
-    {#if showEmojiPicker}
-      <div class="absolute top-full left-1/2 transform -translate-x-1/2 z-50 mt-1">
-        <EmojiPicker
-          answer={$gameState.results?.correct_answer}
-          show={showEmojiPicker}
-          on:select={handleEmojiSelect}
-        />
-      </div>
-    {/if}
-
+    <p class="text-3xl font-bold text-cyan-800 text-center">
+      {$gameState.results?.correct_answer}
+    </p>
     {#if $gameState.results?.acceptable_answers}
       <p class="text-center text-gray-600 mt-3 text-sm font-semibold">Kabul Edilebilir Cevaplar:</p>
       <p class="text-lg text-cyan-700 text-center">
@@ -104,9 +75,19 @@
     <h3 class="font-semibold text-gray-700 mb-4 text-xl">Oyuncu Sonuçları:</h3>
     <div class="space-y-3">
       {#each $gameState.results?.player_votes || [] as vote}
-        <div class="bg-gray-50 p-4 rounded-lg border-2 {vote.was_correct ? 'border-cyan-300 bg-cyan-50' : 'border-gray-200'}">
+        <div class="bg-gray-50 p-4 rounded-lg border-2 {vote.was_correct ? 'border-cyan-300 bg-cyan-50' : 'border-gray-200'} relative">
           <div class="flex justify-between items-start mb-2">
-            <span class="font-bold text-lg text-gray-800">{vote.player_name}</span>
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-lg text-gray-800">{vote.player_name}</span>
+              <button
+                on:click={() => toggleEmojiPicker(vote.player_name)}
+                class="text-xl hover:scale-125 transition-transform"
+                type="button"
+                title="Tepki ekle"
+              >
+                😊
+              </button>
+            </div>
             {#if vote.was_correct}
               <span class="bg-cyan-500 text-white text-xs px-3 py-1 rounded-full font-bold">
                 +1000 PUAN
@@ -114,9 +95,31 @@
             {/if}
           </div>
 
+          <!-- Show reactions for this player -->
+          {#if reactions[vote.player_name?.toLowerCase()]}
+            <div class="flex gap-2 flex-wrap mb-2">
+              {#each Object.entries(reactions[vote.player_name.toLowerCase()]) as [_senderId, reaction]}
+                <span class="text-lg bg-white/70 px-2 py-1 rounded-lg border" title={reaction.player_name || ''}>
+                  {reaction.emoji || reaction} <span class="text-xs text-gray-500">{reaction.player_name || ''}</span>
+                </span>
+              {/each}
+            </div>
+          {/if}
+
+          <!-- Emoji Picker -->
+          {#if showEmojiPicker[vote.player_name]}
+            <div class="absolute top-12 left-0 z-50">
+              <EmojiPicker
+                answer={vote.player_name}
+                show={showEmojiPicker[vote.player_name]}
+                on:select={handleEmojiSelect}
+              />
+            </div>
+          {/if}
+
           <div class="text-sm space-y-1">
             <div class="flex items-center gap-2">
-              <span class="text-gray-600">Seçtiği:</span>
+              <span class="text-gray-600">Sectigi:</span>
               <span class="font-semibold {vote.was_correct ? 'text-cyan-700' : 'text-red-600'}">
                 {vote.voted_for}
               </span>
@@ -129,15 +132,15 @@
 
             {#if vote.fake_answer}
               <div class="flex items-center gap-2 flex-wrap">
-                <span class="text-gray-600">Yanıltıcı cevabı:</span>
+                <span class="text-gray-600">Yaniltici cevabi:</span>
                 <span class="font-semibold text-cyan-700">"{vote.fake_answer}"</span>
                 {#if vote.votes_received > 0}
                   <span class="bg-purple-500 text-white text-xs px-2 py-1 rounded-full font-bold">
-                    {vote.votes_received} kişi kandı! (+{vote.votes_received * 500} puan)
+                    {vote.votes_received} kisi kandi! (+{vote.votes_received * 500} puan)
                   </span>
                 {:else}
                   <span class="bg-gray-400 text-white text-xs px-2 py-1 rounded-full">
-                    Kimseyi kandıramadı
+                    Kimseyi kandiramadi
                   </span>
                 {/if}
               </div>
