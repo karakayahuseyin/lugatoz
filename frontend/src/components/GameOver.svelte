@@ -21,7 +21,7 @@
 
   $: winner = $gameState.leaderboard?.[0];
   $: myAnswers = $gameState.playerId ? $gameState.results?.player_answers?.[$gameState.playerId] : null;
-  $: isHost = $gameState.leaderboard?.find(p => p.socket_id === $gameState.playerId)?.is_host || false;
+  $: isHost = $gameState.players?.find(p => p.socket_id === $gameState.playerId)?.is_host || false;
 </script>
 
 <div class="card max-w-4xl w-full">

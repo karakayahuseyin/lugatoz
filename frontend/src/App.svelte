@@ -110,6 +110,7 @@
         updateGameState({
           phase: 'game_over',
           leaderboard: data.leaderboard,
+          players: data.players,
           results: data
         });
       });

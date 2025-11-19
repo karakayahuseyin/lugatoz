@@ -530,6 +530,7 @@ async def show_final_results(room):
         'final_scores': final_scores,
         'player_answers': player_answers,
         'leaderboard': room.get_leaderboard(),
+        'players': room.to_dict()['players'],
         'questions_summary': [
             {
                 'question': q['question_text'],
