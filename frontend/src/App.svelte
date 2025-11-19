@@ -169,6 +169,22 @@
   onDestroy(() => {
     window.removeEventListener('hashchange', checkRoute);
     if (socket) {
+      // Remove all event listeners before disconnect
+      socket.off('player_joined');
+      socket.off('player_left');
+      socket.off('game_started');
+      socket.off('submission_progress');
+      socket.off('voting_phase');
+      socket.off('voting_progress');
+      socket.off('round_results');
+      socket.off('new_round');
+      socket.off('final_test_phase');
+      socket.off('game_over');
+      socket.off('room_ready_for_new_game');
+      socket.off('returned_to_lobby');
+      socket.off('game_restarted');
+      socket.off('error');
+      socket.off('name_taken');
       socketManager.disconnect();
     }
   });
