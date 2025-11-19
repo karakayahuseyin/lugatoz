@@ -34,19 +34,25 @@
   async function loadQuestions() {
     try {
       const response = await fetch('/api/questions');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       questions = await response.json();
     } catch (error) {
-      console.error('Sorular yüklenemedi:', error);
-      alert('Sorular yüklenemedi! Backend bağlantısını kontrol edin.');
+      console.error('Sorular yuklenemedi:', error);
+      alert('Sorular yuklenemedi! Backend baglantisini kontrol edin.');
     }
   }
 
   async function loadStats() {
     try {
       const response = await fetch('/api/stats');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       stats = await response.json();
     } catch (error) {
-      console.error('İstatistikler yüklenemedi:', error);
+      console.error('Istatistikler yuklenemedi:', error);
     }
   }
 

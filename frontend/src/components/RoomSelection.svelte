@@ -17,10 +17,13 @@
   async function loadRooms() {
     try {
       const response = await fetch('/api/rooms');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       rooms = await response.json();
       loading = false;
     } catch (error) {
-      console.error('Odalar yüklenemedi:', error);
+      console.error('Odalar yuklenemedi:', error);
       loading = false;
     }
   }
