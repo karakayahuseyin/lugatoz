@@ -127,6 +127,34 @@
         notifications.success(data.message);
       });
 
+      socket.on('returned_to_lobby', (data) => {
+        updateGameState({
+          phase: 'lobby',
+          players: data.room_state.players,
+          currentRound: 0,
+          submittedAnswer: false,
+          votedAnswer: false,
+          results: null,
+          finalQuestions: []
+        });
+        notifications.success(data.message);
+      });
+
+      socket.on('game_restarted', (data) => {
+        updateGameState({
+          phase: 'submitting_fake',
+          players: data.room_state.players,
+          currentRound: 0,
+          maxRounds: data.current_question.total_rounds,
+          currentQuestion: { text: data.current_question.text },
+          submittedAnswer: false,
+          votedAnswer: false,
+          results: null,
+          finalQuestions: []
+        });
+        notifications.success(data.message);
+      });
+
       socket.on('error', (data) => {
         setError(data.message);
       });

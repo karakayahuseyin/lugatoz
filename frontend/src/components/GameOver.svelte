@@ -3,14 +3,25 @@
   import { getPlayerColor } from '../utils/colors';
   import { socketManager } from '../utils/socket';
 
-  function playAgain() {
-    // Oda bilgilerini temizle (yeniden oyun başlatmak için)
+  function restartGame() {
+    // Admin yeni oyun baslatir
+    socketManager.emit('restart_game', {});
+  }
+
+  function returnToLobby() {
+    // Admin lobiye doner
+    socketManager.emit('return_to_lobby', {});
+  }
+
+  function leaveGame() {
+    // Oyundan cik
     socketManager.clearRoomInfo();
     resetGameState();
   }
 
   $: winner = $gameState.leaderboard?.[0];
   $: myAnswers = $gameState.playerId ? $gameState.results?.player_answers?.[$gameState.playerId] : null;
+  $: isHost = $gameState.players?.find(p => p.socket_id === $gameState.playerId)?.is_host || false;
 </script>
 
 <div class="card max-w-4xl w-full">
@@ -85,14 +96,45 @@
     </div>
   {/if}
 
-  <button
-    on:click={playAgain}
-    class="btn btn-primary w-full text-xl py-4"
-  >
-    Yeni Oyun
-  </button>
+  {#if isHost}
+    <div class="space-y-3">
+      <button
+        on:click={restartGame}
+        class="btn btn-primary w-full text-xl py-4"
+      >
+        Yeni Oyun Baslat
+      </button>
+      <button
+        on:click={returnToLobby}
+        class="btn btn-secondary w-full text-lg py-3"
+      >
+        Lobiye Don
+      </button>
+    </div>
+  {:else}
+    <div class="space-y-3">
+      <div class="bg-gray-100 p-4 rounded-lg text-center">
+        <p class="text-gray-600">Oyun yoneticisinin karari bekleniyor...</p>
+      </div>
+      <button
+        on:click={leaveGame}
+        class="btn btn-outline w-full text-gray-600"
+      >
+        Oyundan Cik
+      </button>
+    </div>
+  {/if}
+
+  {#if isHost}
+    <button
+      on:click={leaveGame}
+      class="btn btn-outline w-full mt-3 text-gray-600"
+    >
+      Oyundan Cik
+    </button>
+  {/if}
 
   <div class="mt-6 text-center text-gray-600">
-    <p>Oynadığınız için teşekkürler! 🎉</p>
+    <p>Oynadiginiz icin tesekkurler!</p>
   </div>
 </div>

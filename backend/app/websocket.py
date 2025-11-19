@@ -588,7 +588,7 @@ async def handle_reset_room(sid, data):
     """Reset room for new game (only host can do this)"""
     room_code = socket_rooms.get(sid)
     if not room_code:
-        await sio.emit('error', {'message': 'Bir odada değilsiniz!'}, room=sid)
+        await sio.emit('error', {'message': 'Bir odada degilisiniz!'}, room=sid)
         return
 
     room = game_manager.get_room(room_code)
@@ -597,7 +597,7 @@ async def handle_reset_room(sid, data):
 
     # Only host can reset
     if not room.players.get(sid) or not room.players[sid].is_host:
-        await sio.emit('error', {'message': 'Sadece oyun yöneticisi odayı sıfırlayabilir!'}, room=sid)
+        await sio.emit('error', {'message': 'Sadece oyun yoneticisi odayi sifirlayabilir!'}, room=sid)
         return
 
     # Remove all players from socket tracking
@@ -612,10 +612,163 @@ async def handle_reset_room(sid, data):
 
     # Notify everyone that room was reset
     await sio.emit('room_reset', {
-        'message': 'Oda sıfırlandı. Ana sayfaya yönlendiriliyorsunuz...'
+        'message': 'Oda sifirlandi. Ana sayfaya yonlendiriliyorsunuz...'
     }, room=room_code)
 
     print(f"Room {room_code} reset by host")
+
+
+@sio.on('return_to_lobby')
+async def handle_return_to_lobby(sid, data):
+    """Return to lobby with same players (only host can do this)"""
+    room_code = socket_rooms.get(sid)
+    if not room_code:
+        await sio.emit('error', {'message': 'Bir odada degilisiniz!'}, room=sid)
+        return
+
+    room = game_manager.get_room(room_code)
+    if not room:
+        return
+
+    # Only host can return to lobby
+    if not room.players.get(sid) or not room.players[sid].is_host:
+        await sio.emit('error', {'message': 'Sadece oyun yoneticisi lobiye donebilir!'}, room=sid)
+        return
+
+    # Keep players but reset game state
+    player_ids = list(room.players.keys())
+    player_names = {pid: p.name for pid, p in room.players.items()}
+    player_colors = {pid: p.color for pid, p in room.players.items()}
+    host_id = next((pid for pid, p in room.players.items() if p.is_host), None)
+
+    # Reset the room
+    game_manager.reset_room(room_code)
+
+    # Re-add players with same colors
+    room = game_manager.get_room(room_code)
+    for pid in player_ids:
+        room.players[pid] = Player(
+            socket_id=pid,
+            name=player_names[pid],
+            is_host=(pid == host_id),
+            color=player_colors[pid]
+        )
+
+    # Notify all players
+    await sio.emit('returned_to_lobby', {
+        'message': 'Lobiye donuldu!',
+        'room_state': room.to_dict()
+    }, room=room_code)
+
+    print(f"Room {room_code} returned to lobby by host")
+
+
+@sio.on('restart_game')
+async def handle_restart_game(sid, data):
+    """Restart game with same players (only host can do this)"""
+    room_code = socket_rooms.get(sid)
+    if not room_code:
+        await sio.emit('error', {'message': 'Bir odada degilisiniz!'}, room=sid)
+        return
+
+    room = game_manager.get_room(room_code)
+    if not room:
+        return
+
+    # Only host can restart
+    if not room.players.get(sid) or not room.players[sid].is_host:
+        await sio.emit('error', {'message': 'Sadece oyun yoneticisi yeni oyun baslayabilir!'}, room=sid)
+        return
+
+    # Need at least 2 players
+    if len(room.players) < 2:
+        await sio.emit('error', {'message': 'Yeni oyun icin en az 2 oyuncu gerekli!'}, room=sid)
+        return
+
+    # Keep players but reset game state
+    player_ids = list(room.players.keys())
+    player_names = {pid: p.name for pid, p in room.players.items()}
+    player_colors = {pid: p.color for pid, p in room.players.items()}
+    host_id = next((pid for pid, p in room.players.items() if p.is_host), None)
+
+    # Reset the room
+    game_manager.reset_room(room_code)
+
+    # Re-add players with same colors
+    room = game_manager.get_room(room_code)
+    for pid in player_ids:
+        room.players[pid] = Player(
+            socket_id=pid,
+            name=player_names[pid],
+            is_host=(pid == host_id),
+            color=player_colors[pid]
+        )
+
+    # Get questions from database
+    db = SessionLocal()
+    try:
+        questions = db.query(Question).all()
+        questions_list = [
+            {
+                'id': q.id,
+                'question_text': q.question_text,
+                'correct_answer': q.correct_answer,
+                'acceptable_answers': q.acceptable_answers
+            }
+            for q in questions
+        ]
+    finally:
+        db.close()
+
+    if len(questions_list) < room.max_rounds:
+        await sio.emit('error', {'message': f'Yeterli soru yok! En az {room.max_rounds} soru gerekli.'}, room=sid)
+        return
+
+    # Start the game
+    room.start_game(questions_list)
+
+    # Track stats
+    db = SessionLocal()
+    try:
+        stats = db.query(GameStats).first()
+        if stats:
+            stats.total_sessions = (stats.total_sessions or 0) + 1
+            stats.total_players = (stats.total_players or 0) + len(room.players)
+            db.commit()
+
+        # Update question stats
+        for q in room.questions:
+            question_stat = db.query(QuestionStats).filter(QuestionStats.question_id == q['id']).first()
+            if not question_stat:
+                question_stat = QuestionStats(
+                    question_id=q['id'],
+                    times_asked=0,
+                    times_correct=0,
+                    times_wrong=0,
+                    total_players_seen=0,
+                    games_used=0
+                )
+                db.add(question_stat)
+                db.flush()
+            question_stat.games_used = (question_stat.games_used or 0) + 1
+            question_stat.total_players_seen = (question_stat.total_players_seen or 0) + len(room.players)
+        db.commit()
+    finally:
+        db.close()
+
+    # Notify all players
+    current_round = room.rounds[0]
+    await sio.emit('game_restarted', {
+        'message': 'Yeni oyun basladi!',
+        'room_state': room.to_dict(),
+        'current_question': {
+            'round': 1,
+            'total_rounds': room.max_rounds,
+            'text': current_round.question_text
+        }
+    }, room=room_code)
+
+    print(f"Game restarted in room {room_code} with {len(room.players)} players")
 
 
 # Create ASGI application
