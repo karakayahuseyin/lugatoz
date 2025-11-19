@@ -59,7 +59,7 @@
   </div>
 
   <div class="bg-gradient-to-r from-cyan-100 to-emerald-100 p-6 rounded-xl border-2 border-cyan-300 mb-6">
-    <p class="text-center text-gray-700 mb-2 font-semibold">Dogru Cevap:</p>
+    <p class="text-center text-gray-700 mb-2 font-semibold">Doğru Cevap:</p>
     <p class="text-3xl font-bold text-cyan-800 text-center">
       {$gameState.results?.correct_answer}
     </p>
@@ -119,7 +119,7 @@
 
           <div class="text-sm space-y-1">
             <div class="flex items-center gap-2">
-              <span class="text-gray-600">Sectigi:</span>
+              <span class="text-gray-600">Seçtiği:</span>
               <span class="font-semibold {vote.was_correct ? 'text-cyan-700' : 'text-red-600'}">
                 {vote.voted_for}
               </span>
@@ -132,15 +132,15 @@
 
             {#if vote.fake_answer}
               <div class="flex items-center gap-2 flex-wrap">
-                <span class="text-gray-600">Yaniltici cevabi:</span>
+                <span class="text-gray-600">Yanıltıcı cevabı:</span>
                 <span class="font-semibold text-cyan-700">"{vote.fake_answer}"</span>
                 {#if vote.votes_received > 0}
                   <span class="bg-purple-500 text-white text-xs px-2 py-1 rounded-full font-bold">
-                    {vote.votes_received} kisi kandi! (+{vote.votes_received * 500} puan)
+                    {vote.votes_received} kişi kandı! (+{vote.votes_received * 500} puan)
                   </span>
                 {:else}
                   <span class="bg-gray-400 text-white text-xs px-2 py-1 rounded-full">
-                    Kimseyi kandiramadi
+                    Kimseyi kandıramadı
                   </span>
                 {/if}
               </div>

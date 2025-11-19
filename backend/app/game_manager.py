@@ -2,14 +2,38 @@
 import random
 import string
 import time
+import threading
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 
 
+def turkish_lower(text: str) -> str:
+    """Convert text to lowercase with proper Turkish character handling"""
+    # Turkish-specific character mappings
+    turkish_map = {
+        'İ': 'i',   # Turkish dotted I
+        'I': 'ı',   # Turkish dotless I
+        'Ş': 'ş',
+        'Ğ': 'ğ',
+        'Ü': 'ü',
+        'Ö': 'ö',
+        'Ç': 'ç',
+    }
+
+    result = []
+    for char in text:
+        if char in turkish_map:
+            result.append(turkish_map[char])
+        else:
+            result.append(char.lower())
+
+    return ''.join(result)
+
+
 def normalize_answer(answer: str) -> str:
     """Normalize answer for comparison"""
-    return answer.strip().lower()
+    return turkish_lower(answer.strip())
 
 
 def check_answer(user_answer: str, correct_answer: str, acceptable_answers: Optional[str] = None) -> bool:
@@ -84,6 +108,7 @@ class GameRoom:
         self.created_at = time.time()
         self.final_test_start_time: Optional[float] = None
         self.final_test_duration = 120  # 120 seconds for final test
+        self._lock = threading.Lock()  # Lock for thread-safe operations
 
     def add_player(self, socket_id: str, name: str) -> bool:
         """Add player"""
@@ -153,61 +178,62 @@ class GameRoom:
 
     def submit_fake_answer(self, socket_id: str, fake_answer: str) -> bool:
         """Submit fake answer"""
-        if self.phase != GamePhase.SUBMITTING_FAKE:
-            return False
+        with self._lock:  # Thread-safe to prevent duplicate answers
+            if self.phase != GamePhase.SUBMITTING_FAKE:
+                return False
 
-        if socket_id not in self.players:
-            return False
+            if socket_id not in self.players:
+                return False
 
-        current_round = self.rounds[self.current_round]
-        normalized_answer = normalize_answer(fake_answer)
+            current_round = self.rounds[self.current_round]
+            normalized_answer = normalize_answer(fake_answer)
 
-        # If answer is empty (timeout penalty), accept it but don't add to options
-        if not normalized_answer:
+            # If answer is empty (timeout penalty), accept it but don't add to options
+            if not normalized_answer:
+                submit_time = time.time()
+                time_taken = submit_time - current_round.start_time
+
+                player = self.players[socket_id]
+                player.submitted_answer = ""
+                player.submit_time = submit_time
+                player.score -= 100  # Penalty for not submitting
+
+                # Mark as submitted by adding empty string
+                current_round.fake_answers[socket_id] = ""
+
+                # If all players submitted, move to voting
+                if len(current_round.fake_answers) == len(self.players):
+                    self._prepare_voting()
+
+                return True
+
+            # Normalize and check if answer is correct (prevent submitting correct answer)
+            if check_answer(fake_answer, current_round.correct_answer, current_round.acceptable_answers):
+                return False  # Cannot submit correct answer as fake
+
+            # Check if answer already submitted by another player (exclude empty strings)
+            existing_answers = [normalize_answer(ans) for ans in current_round.fake_answers.values() if ans]
+            if normalized_answer in existing_answers:
+                return False  # Cannot submit duplicate answer
+
+            # Check time limit (20 seconds)
             submit_time = time.time()
             time_taken = submit_time - current_round.start_time
 
+            current_round.fake_answers[socket_id] = normalized_answer
             player = self.players[socket_id]
-            player.submitted_answer = ""
+            player.submitted_answer = normalize_answer(fake_answer)
             player.submit_time = submit_time
-            player.score -= 100  # Penalty for not submitting
 
-            # Mark as submitted by adding empty string
-            current_round.fake_answers[socket_id] = ""
+            # Penalty for taking too long (more than 20 seconds)
+            if time_taken > 20:
+                player.score -= 100  # -100 points for timeout
 
             # If all players submitted, move to voting
             if len(current_round.fake_answers) == len(self.players):
                 self._prepare_voting()
 
             return True
-
-        # Normalize and check if answer is correct (prevent submitting correct answer)
-        if check_answer(fake_answer, current_round.correct_answer, current_round.acceptable_answers):
-            return False  # Cannot submit correct answer as fake
-
-        # Check if answer already submitted by another player (exclude empty strings)
-        existing_answers = [normalize_answer(ans) for ans in current_round.fake_answers.values() if ans]
-        if normalized_answer in existing_answers:
-            return False  # Cannot submit duplicate answer
-
-        # Check time limit (20 seconds)
-        submit_time = time.time()
-        time_taken = submit_time - current_round.start_time
-
-        current_round.fake_answers[socket_id] = normalized_answer
-        player = self.players[socket_id]
-        player.submitted_answer = normalize_answer(fake_answer)
-        player.submit_time = submit_time
-
-        # Penalty for taking too long (more than 20 seconds)
-        if time_taken > 20:
-            player.score -= 100  # -100 points for timeout
-
-        # If all players submitted, move to voting
-        if len(current_round.fake_answers) == len(self.players):
-            self._prepare_voting()
-
-        return True
 
     def _prepare_voting(self):
         """Prepare voting options"""

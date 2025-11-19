@@ -102,25 +102,25 @@
         on:click={restartGame}
         class="btn btn-primary w-full text-xl py-4"
       >
-        Yeni Oyun Baslat
+        Yeni Oyun Başlat
       </button>
       <button
         on:click={returnToLobby}
         class="btn btn-secondary w-full text-lg py-3"
       >
-        Lobiye Don
+        Lobiye Dön
       </button>
     </div>
   {:else}
     <div class="space-y-3">
       <div class="bg-gray-100 p-4 rounded-lg text-center">
-        <p class="text-gray-600">Oyun yoneticisinin karari bekleniyor...</p>
+        <p class="text-gray-600">Oyun yöneticisinin kararı bekleniyor...</p>
       </div>
       <button
         on:click={leaveGame}
         class="btn btn-outline w-full text-gray-600"
       >
-        Oyundan Cik
+        Oyundan Çık
       </button>
     </div>
   {/if}
@@ -135,6 +135,6 @@
   {/if}
 
   <div class="mt-6 text-center text-gray-600">
-    <p>Oynadiginiz icin tesekkurler!</p>
+    <p>Oynadığınız için teşekkürler!</p>
   </div>
 </div>

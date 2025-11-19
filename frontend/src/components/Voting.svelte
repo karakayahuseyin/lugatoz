@@ -15,7 +15,7 @@
 
   function submitVote() {
     if (!selectedAnswer) {
-      notifications.warning('Lutfen bir cevap secin!');
+      notifications.warning('Lütfen bir cevap seçin!');
       return;
     }
 
@@ -31,7 +31,7 @@
     if (selectedAnswer) {
       submitVote();
     } else {
-      notifications.error('Sure doldu! Cevap secmediniz, -100 puan cezasi aldiniz.');
+      notifications.error('Süre doldu! Cevap seçmediniz, -100 puan cezası aldınız.');
       // Submit empty to trigger penalty
       socketManager.emit('submit_vote', {
         answer: ''
@@ -51,7 +51,7 @@
   // Listen for error from backend
   socketManager.on('vote_rejected', (data) => {
     if (data.reason === 'own_answer') {
-      notifications.error('Kendi yanlis cevabinizi secemezsiniz!');
+      notifications.error('Kendi yanlış cevabınızı seçemezsiniz!');
       selectedAnswer = null;
     }
   });
