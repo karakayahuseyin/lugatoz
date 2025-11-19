@@ -2,7 +2,7 @@
 import socketio
 import asyncio
 from typing import Dict
-from .game_manager import game_manager, GamePhase, check_answer, Player
+from .game_manager import game_manager, GamePhase, check_answer, Player, GameManager
 from .database import SessionLocal
 from .models import Question, GameStats, QuestionStats
 from datetime import datetime
@@ -30,13 +30,12 @@ def get_player_room(sid):
 @sio.event
 async def connect(sid, environ):
     """When client connects"""
-    print(f"Client connected: {sid}")
+    pass
 
 
 @sio.event
 async def disconnect(sid):
     """When client disconnects"""
-    print(f"Client disconnected: {sid}")
 
     # Get the room this socket was in
     room_code = socket_rooms.get(sid)
@@ -56,7 +55,6 @@ async def disconnect(sid):
             # Reset room if empty
             if len(room.players) == 0:
                 game_manager.reset_room(room_code)
-                print(f"Room {room_code} reset (empty after disconnect)")
 
         # Remove from tracking
         if sid in socket_rooms:
@@ -109,8 +107,6 @@ async def handle_join_game(sid, data):
         },
         'room_state': room.to_dict()
     }, room=room.room_code)
-
-    print(f"{player_name} joined game (total: {len(room.players)}/4)")
 
 
 @sio.on('start_game')
@@ -190,8 +186,6 @@ async def handle_start_game(sid, data):
             'text': current_round.question_text
         }
     }, room=room.room_code)
-
-    print(f"Game started with {len(room.players)} players")
 
 
 @sio.on('submit_fake_answer')
@@ -388,32 +382,15 @@ async def auto_reset_room(room_code):
 
     # Only reset if still in game over state
     if room and room.phase == GamePhase.GAME_OVER:
-        # Keep players but reset game state
-        player_ids = list(room.players.keys())
-        player_names = {pid: p.name for pid, p in room.players.items()}
-        player_colors = {pid: p.color for pid, p in room.players.items()}
-        host_id = next((pid for pid, p in room.players.items() if p.is_host), None)
-
-        # Reset the room
-        game_manager.reset_room(room_code)
-
-        # Re-add players with same colors
-        room = game_manager.get_room(room_code)
-        for pid in player_ids:
-            room.players[pid] = Player(
-                socket_id=pid,
-                name=player_names[pid],
-                is_host=(pid == host_id),
-                color=player_colors[pid]
-            )
+        # Reset room but keep players
+        room = game_manager.reset_room_keep_players(room_code)
 
         # Notify all players
         await sio.emit('room_ready_for_new_game', {
-            'message': 'Oda yeni oyun için hazır!',
+            'message': 'Oda yeni oyun icin hazir!',
             'room_state': room.to_dict()
         }, room=room_code)
 
-        print(f"Room {room_code} reset to WAITING with same players")
 
 
 @sio.on('next_round')
@@ -572,7 +549,6 @@ async def handle_leave_room(sid, data):
             # Reset room if empty
             if len(room.players) == 0:
                 game_manager.reset_room(room_code)
-                print(f"Room {room_code} reset (empty)")
 
         # Leave Socket.IO room
         await sio.leave_room(sid, room_code)
@@ -581,7 +557,6 @@ async def handle_leave_room(sid, data):
         if sid in socket_rooms:
             del socket_rooms[sid]
 
-        print(f"Player left room {room_code}")
 
 
 @sio.on('reset_room')
@@ -616,7 +591,6 @@ async def handle_reset_room(sid, data):
         'message': 'Oda sifirlandi. Ana sayfaya yonlendiriliyorsunuz...'
     }, room=room_code)
 
-    print(f"Room {room_code} reset by host")
 
 
 @sio.on('return_to_lobby')
@@ -636,24 +610,8 @@ async def handle_return_to_lobby(sid, data):
         await sio.emit('error', {'message': 'Sadece oyun yoneticisi lobiye donebilir!'}, room=sid)
         return
 
-    # Keep players but reset game state
-    player_ids = list(room.players.keys())
-    player_names = {pid: p.name for pid, p in room.players.items()}
-    player_colors = {pid: p.color for pid, p in room.players.items()}
-    host_id = next((pid for pid, p in room.players.items() if p.is_host), None)
-
-    # Reset the room
-    game_manager.reset_room(room_code)
-
-    # Re-add players with same colors
-    room = game_manager.get_room(room_code)
-    for pid in player_ids:
-        room.players[pid] = Player(
-            socket_id=pid,
-            name=player_names[pid],
-            is_host=(pid == host_id),
-            color=player_colors[pid]
-        )
+    # Reset room but keep players
+    room = game_manager.reset_room_keep_players(room_code)
 
     # Notify all players
     await sio.emit('returned_to_lobby', {
@@ -661,7 +619,6 @@ async def handle_return_to_lobby(sid, data):
         'room_state': room.to_dict()
     }, room=room_code)
 
-    print(f"Room {room_code} returned to lobby by host")
 
 
 @sio.on('restart_game')
@@ -686,24 +643,8 @@ async def handle_restart_game(sid, data):
         await sio.emit('error', {'message': 'Yeni oyun icin en az 2 oyuncu gerekli!'}, room=sid)
         return
 
-    # Keep players but reset game state
-    player_ids = list(room.players.keys())
-    player_names = {pid: p.name for pid, p in room.players.items()}
-    player_colors = {pid: p.color for pid, p in room.players.items()}
-    host_id = next((pid for pid, p in room.players.items() if p.is_host), None)
-
-    # Reset the room
-    game_manager.reset_room(room_code)
-
-    # Re-add players with same colors
-    room = game_manager.get_room(room_code)
-    for pid in player_ids:
-        room.players[pid] = Player(
-            socket_id=pid,
-            name=player_names[pid],
-            is_host=(pid == host_id),
-            color=player_colors[pid]
-        )
+    # Reset room but keep players
+    room = game_manager.reset_room_keep_players(room_code)
 
     # Get questions from database
     db = SessionLocal()
@@ -769,7 +710,6 @@ async def handle_restart_game(sid, data):
         }
     }, room=room_code)
 
-    print(f"Game restarted in room {room_code} with {len(room.players)} players")
 
 
 # Create ASGI application

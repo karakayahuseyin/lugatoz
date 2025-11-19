@@ -64,8 +64,8 @@
         });
       });
 
-      socket.on('submission_progress', (data) => {
-        console.log(`Cevap gönderme: ${data.submitted}/${data.total}`);
+      socket.on('submission_progress', () => {
+        // Progress update received
       });
 
       socket.on('voting_phase', (data) => {
@@ -76,8 +76,8 @@
         });
       });
 
-      socket.on('voting_progress', (data) => {
-        console.log(`Oylama: ${data.voted}/${data.total}`);
+      socket.on('voting_progress', () => {
+        // Voting progress update received
       });
 
       socket.on('round_results', (data) => {

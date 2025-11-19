@@ -461,6 +461,34 @@ class GameManager:
         if room_code in self.rooms:
             self.rooms[room_code] = GameRoom(room_code, max_players=4)
 
+    def reset_room_keep_players(self, room_code: str) -> Optional[GameRoom]:
+        """Reset room but keep the same players with their colors and host status"""
+        if room_code not in self.rooms:
+            return None
+
+        room = self.rooms[room_code]
+
+        # Store player info
+        player_ids = list(room.players.keys())
+        player_names = {pid: p.name for pid, p in room.players.items()}
+        player_colors = {pid: p.color for pid, p in room.players.items()}
+        host_id = next((pid for pid, p in room.players.items() if p.is_host), None)
+
+        # Reset the room
+        self.reset_room(room_code)
+
+        # Re-add players with same colors
+        room = self.rooms[room_code]
+        for pid in player_ids:
+            room.players[pid] = Player(
+                socket_id=pid,
+                name=player_names[pid],
+                is_host=(pid == host_id),
+                color=player_colors[pid]
+            )
+
+        return room
+
 
 # Global game manager instance
 game_manager = GameManager()

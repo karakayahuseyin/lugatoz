@@ -51,10 +51,7 @@
 
   // Visibility API - sayfa arka plana alindiginda bile calisir
   function handleVisibilityChange() {
-    if (document.hidden) {
-      console.log('Sayfa arka plana alindi - timer calismaya devam ediyor');
-    } else {
-      console.log('Sayfa on plana geldi - timer senkronize ediliyor');
+    if (!document.hidden) {
       // On plana geldiginde zamani yeniden hesapla
       if (isRunning && endTime) {
         const now = Date.now();

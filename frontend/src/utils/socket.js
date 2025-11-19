@@ -27,12 +27,10 @@ class SocketManager {
     });
 
     this.socket.on('connect', () => {
-      console.log('Socket baglantisi kuruldu:', this.socket.id);
       this.connected = true;
 
       // Eger daha once bir odadaysa, otomatik yeniden katil
       if (this.lastRoomCode && this.lastPlayerName && this.isReconnecting) {
-        console.log('Odaya yeniden baglaniliyor:', this.lastRoomCode);
         setTimeout(() => {
           this.socket.emit('join_game', {
             player_name: this.lastPlayerName,
@@ -44,7 +42,6 @@ class SocketManager {
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('Socket baglantisi kesildi:', reason);
       this.connected = false;
 
       // Eger sunucu kapatmadiysa (transport close veya ping timeout), yeniden baglanma isareti
@@ -53,21 +50,20 @@ class SocketManager {
       }
     });
 
-    this.socket.on('reconnect', (attemptNumber) => {
-      console.log('Yeniden baglandi! Deneme:', attemptNumber);
+    this.socket.on('reconnect', () => {
+      // Reconnected successfully
     });
 
-    this.socket.on('reconnect_attempt', (attemptNumber) => {
-      console.log('Yeniden baglanma denemesi:', attemptNumber);
+    this.socket.on('reconnect_attempt', () => {
+      // Attempting to reconnect
     });
 
     this.socket.on('reconnect_failed', () => {
-      console.error('Yeniden baglanma basarisiz!');
       this.isReconnecting = false;
     });
 
-    this.socket.on('error', (error) => {
-      console.error('Socket hatasi:', error);
+    this.socket.on('error', () => {
+      // Socket error occurred
     });
 
     return this.socket;
