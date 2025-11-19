@@ -1,10 +1,9 @@
 <script>
   import { onMount } from 'svelte';
-  import { updateGameState } from '../stores/gameStore';
   import HowToPlay from './HowToPlay.svelte';
 
   export let playerName = '';
-  export let onRoomSelect = (roomCode) => {};
+  export let onRoomSelect = () => {};
 
   let rooms = [];
   let loading = true;

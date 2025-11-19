@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { gameState, updateGameState, setError, resetGameState } from './stores/gameStore';
+  import { gameState, updateGameState, setError } from './stores/gameStore';
   import { socketManager } from './utils/socket';
   import { notifications } from './stores/notificationStore';
 
