@@ -11,12 +11,47 @@ from datetime import datetime
 sio = socketio.AsyncServer(
     async_mode='asgi',
     cors_allowed_origins='*',
-    logger=True,
-    engineio_logger=True
+    logger=False,
+    engineio_logger=False
 )
 
 # Track which room each socket is in
 socket_rooms: Dict[str, str] = {}  # socket_id -> room_code
+
+# Track active tasks per room to prevent duplicates
+room_tasks: Dict[str, Dict[str, asyncio.Task]] = {}  # room_code -> {task_name -> task}
+
+
+def cancel_room_task(room_code: str, task_name: str):
+    """Cancel a specific task for a room if it exists"""
+    if room_code in room_tasks and task_name in room_tasks[room_code]:
+        task = room_tasks[room_code][task_name]
+        if not task.done():
+            task.cancel()
+        del room_tasks[room_code][task_name]
+
+
+def create_room_task(room_code: str, task_name: str, coro):
+    """Create a tracked task for a room, cancelling any existing task with same name"""
+    # Cancel existing task if any
+    cancel_room_task(room_code, task_name)
+
+    # Initialize room tasks dict if needed
+    if room_code not in room_tasks:
+        room_tasks[room_code] = {}
+
+    # Create and track new task
+    task = asyncio.create_task(coro)
+    room_tasks[room_code][task_name] = task
+    return task
+
+
+def cancel_all_room_tasks(room_code: str):
+    """Cancel all tasks for a room"""
+    if room_code in room_tasks:
+        for task_name in list(room_tasks[room_code].keys()):
+            cancel_room_task(room_code, task_name)
+        del room_tasks[room_code]
 
 
 def get_player_room(sid):
@@ -292,7 +327,7 @@ async def handle_submit_vote(sid, data):
         await sio.emit('round_results', results, room=room.room_code)
 
         # Auto proceed to next round after 10 seconds
-        asyncio.create_task(auto_next_round(room.room_code))
+        create_room_task(room.room_code, 'auto_next_round', auto_next_round(room.room_code))
 
 
 @sio.on('add_reaction')
@@ -346,7 +381,7 @@ async def auto_next_round(room_code):
         }, room=room_code)
 
         # Start timeout for final test (120 seconds)
-        asyncio.create_task(auto_finish_final_test(room_code))
+        create_room_task(room_code, 'auto_finish_final_test', auto_finish_final_test(room_code))
     else:
         # New round
         current_round = room.rounds[room.current_round]
@@ -520,7 +555,7 @@ async def show_final_results(room):
     }, room=room.room_code)
 
     # After 30 seconds, reset the room to WAITING state for new game
-    asyncio.create_task(auto_reset_room(room.room_code))
+    create_room_task(room.room_code, 'auto_reset_room', auto_reset_room(room.room_code))
 
 
 @sio.on('finish_game')
@@ -611,6 +646,9 @@ async def handle_return_to_lobby(sid, data):
         await sio.emit('error', {'message': 'Sadece oyun yoneticisi lobiye donebilir!'}, room=sid)
         return
 
+    # Cancel all pending tasks for this room
+    cancel_all_room_tasks(room_code)
+
     # Reset room but keep players
     room = game_manager.reset_room_keep_players(room_code)
 
@@ -643,6 +681,9 @@ async def handle_restart_game(sid, data):
     if len(room.players) < 2:
         await sio.emit('error', {'message': 'Yeni oyun icin en az 2 oyuncu gerekli!'}, room=sid)
         return
+
+    # Cancel all pending tasks for this room
+    cancel_all_room_tasks(room_code)
 
     # Reset room but keep players
     room = game_manager.reset_room_keep_players(room_code)
