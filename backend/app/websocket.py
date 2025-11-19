@@ -2,7 +2,7 @@
 import socketio
 import asyncio
 from typing import Dict
-from .game_manager import game_manager, GamePhase, check_answer
+from .game_manager import game_manager, GamePhase, check_answer, Player
 from .database import SessionLocal
 from .models import Question, GameStats, QuestionStats
 from datetime import datetime
