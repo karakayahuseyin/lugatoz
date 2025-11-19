@@ -475,7 +475,7 @@ async def show_final_results(room):
             stats.completed_sessions += 1
             stats.total_players += len(room.players)
 
-            # Count total questions answered and correct/wrong
+            # Count total questions answered and correct/wrong per player
             for player_id in room.players:
                 answers = player_answers[player_id]
                 stats.total_questions_answered += len(answers)
@@ -492,6 +492,7 @@ async def show_final_results(room):
                     ).first()
 
                     if question_stat:
+                        # times_asked increases per player (not per game)
                         question_stat.times_asked = (question_stat.times_asked or 0) + 1
                         if answer['is_correct']:
                             question_stat.times_correct = (question_stat.times_correct or 0) + 1
