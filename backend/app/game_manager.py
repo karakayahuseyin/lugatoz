@@ -379,7 +379,8 @@ class GameRoom:
                 'name': player.name,
                 'score': player.score,
                 'socket_id': player.socket_id,
-                'color': player.color
+                'color': player.color,
+                'is_host': player.is_host
             }
             for player in sorted_players
         ]
