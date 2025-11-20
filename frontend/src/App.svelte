@@ -3,6 +3,7 @@
   import { gameState, updateGameState, setError } from './stores/gameStore';
   import { socketManager } from './utils/socket';
   import { notifications } from './stores/notificationStore';
+  import { userStore } from './stores/userStore';
 
   import Home from './components/Home.svelte';
   import RoomSelection from './components/RoomSelection.svelte';
@@ -26,6 +27,9 @@
   }
 
   onMount(() => {
+    // Load user from localStorage
+    userStore.loadFromStorage();
+
     // Route kontrolü
     checkRoute();
     window.addEventListener('hashchange', checkRoute);

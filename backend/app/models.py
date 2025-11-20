@@ -1,10 +1,16 @@
 # -*- coding: utf-8 -*-
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Text, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Text, DateTime, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
+import random
 
 Base = declarative_base()
+
+
+def generate_user_id():
+    """Generate a unique 5-digit user ID"""
+    return random.randint(10000, 99999)
 
 
 class Question(Base):
@@ -89,3 +95,54 @@ class QuestionStats(Base):
 
     def __repr__(self):
         return f"<QuestionStats(question_id={self.question_id}, asked={self.times_asked})>"
+
+
+class User(Base):
+    """User account model"""
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, unique=True, nullable=False, index=True)  # 5-digit unique ID
+    username = Column(String(50), unique=True, nullable=False, index=True)  # Unique username
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_login = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_active = Column(Boolean, default=True)
+
+    stats = relationship("UserStats", back_populates="user", uselist=False, cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<User(user_id={self.user_id}, username='{self.username}')>"
+
+
+class UserStats(Base):
+    """User statistics model"""
+    __tablename__ = "user_stats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False, unique=True, index=True)
+
+    # Game statistics
+    total_games_played = Column(Integer, default=0)
+    total_games_won = Column(Integer, default=0)
+    total_score = Column(Integer, default=0)
+    highest_score = Column(Integer, default=0)
+
+    # Question statistics
+    total_questions_answered = Column(Integer, default=0)
+    total_correct_answers = Column(Integer, default=0)
+    total_wrong_answers = Column(Integer, default=0)
+
+    # Deception statistics
+    total_players_deceived = Column(Integer, default=0)  # Kaç kişiyi kandırdı
+    total_times_deceived = Column(Integer, default=0)  # Kaç kere kandırıldı
+
+    # Time statistics
+    average_answer_time = Column(Integer, default=0)  # Ortalama cevap süresi (saniye)
+    total_play_time = Column(Integer, default=0)  # Toplam oyun süresi (saniye)
+
+    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", back_populates="stats")
+
+    def __repr__(self):
+        return f"<UserStats(user_id={self.user_id}, games={self.total_games_played})>"

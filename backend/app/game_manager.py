@@ -70,6 +70,8 @@ class Player:
     score: int = 0
     is_host: bool = False
     color: str = "blue"  # Player color: blue, red, orange, green
+    user_id: Optional[int] = None  # Link to User account
+    is_connected: bool = True  # Connection status for reconnection
     submitted_answer: Optional[str] = None
     voted_answer: Optional[str] = None
     final_answers: Dict[int, str] = field(default_factory=dict)

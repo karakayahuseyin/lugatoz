@@ -4,7 +4,8 @@ import asyncio
 from typing import Dict
 from .game_manager import game_manager, GamePhase, check_answer, Player, GameManager
 from .database import SessionLocal
-from .models import Question, GameStats, QuestionStats
+from .models import Question, GameStats, QuestionStats, User, UserStats
+from .auth import create_user, get_user_by_id, get_user_by_username, update_username, update_last_login, get_leaderboard, update_user_stats_after_game
 from datetime import datetime
 
 # Create Socket.IO server
@@ -17,6 +18,9 @@ sio = socketio.AsyncServer(
 
 # Track which room each socket is in
 socket_rooms: Dict[str, str] = {}  # socket_id -> room_code
+
+# Track user_id for each socket
+socket_users: Dict[str, int] = {}  # socket_id -> user_id
 
 # Track active tasks per room to prevent duplicates
 room_tasks: Dict[str, Dict[str, asyncio.Task]] = {}  # room_code -> {task_name -> task}
@@ -68,9 +72,133 @@ async def connect(sid, environ):
     pass
 
 
+@sio.on('register_user')
+async def handle_register_user(sid, data):
+    """Register a new user account"""
+    username = data.get('username', '').strip()
+
+    if not username or len(username) < 3:
+        await sio.emit('register_error', {
+            'message': 'Kullanıcı adı en az 3 karakter olmalıdır!'
+        }, room=sid)
+        return
+
+    if len(username) > 50:
+        await sio.emit('register_error', {
+            'message': 'Kullanıcı adı en fazla 50 karakter olabilir!'
+        }, room=sid)
+        return
+
+    db = SessionLocal()
+    try:
+        user = create_user(db, username)
+        if not user:
+            await sio.emit('register_error', {
+                'message': 'Bu kullanıcı adı zaten kullanılıyor!'
+            }, room=sid)
+            return
+
+        # Track user
+        socket_users[sid] = user.user_id
+
+        await sio.emit('register_success', {
+            'user_id': user.user_id,
+            'username': user.username
+        }, room=sid)
+    finally:
+        db.close()
+
+
+@sio.on('login_user')
+async def handle_login_user(sid, data):
+    """Login with user_id or username"""
+    user_id = data.get('user_id')
+    username = data.get('username')
+
+    db = SessionLocal()
+    try:
+        user = None
+        if user_id:
+            user = get_user_by_id(db, user_id)
+        elif username:
+            user = get_user_by_username(db, username)
+
+        if not user:
+            await sio.emit('login_error', {
+                'message': 'Kullanıcı bulunamadı!'
+            }, room=sid)
+            return
+
+        # Update last login
+        update_last_login(db, user.user_id)
+
+        # Track user
+        socket_users[sid] = user.user_id
+
+        await sio.emit('login_success', {
+            'user_id': user.user_id,
+            'username': user.username
+        }, room=sid)
+    finally:
+        db.close()
+
+
+@sio.on('change_username')
+async def handle_change_username(sid, data):
+    """Change user's username"""
+    new_username = data.get('new_username', '').strip()
+
+    if sid not in socket_users:
+        await sio.emit('username_change_error', {
+            'message': 'Giriş yapmanız gerekiyor!'
+        }, room=sid)
+        return
+
+    if not new_username or len(new_username) < 3:
+        await sio.emit('username_change_error', {
+            'message': 'Kullanıcı adı en az 3 karakter olmalıdır!'
+        }, room=sid)
+        return
+
+    user_id = socket_users[sid]
+    db = SessionLocal()
+    try:
+        success = update_username(db, user_id, new_username)
+        if not success:
+            await sio.emit('username_change_error', {
+                'message': 'Bu kullanıcı adı zaten kullanılıyor!'
+            }, room=sid)
+            return
+
+        await sio.emit('username_change_success', {
+            'username': new_username
+        }, room=sid)
+    finally:
+        db.close()
+
+
+@sio.on('get_leaderboard')
+async def handle_get_leaderboard(sid, data):
+    """Get global leaderboard"""
+    limit = data.get('limit', 100)
+
+    db = SessionLocal()
+    try:
+        leaderboard = get_leaderboard(db, limit)
+        await sio.emit('leaderboard_data', {
+            'leaderboard': leaderboard
+        }, room=sid)
+    finally:
+        db.close()
+
+
 @sio.event
 async def disconnect(sid):
     """When client disconnects"""
+
+    # Remove user tracking (but keep user account active)
+    if sid in socket_users:
+        del socket_users[sid]
 
     # Get the room this socket was in
     room_code = socket_rooms.get(sid)
@@ -78,20 +206,18 @@ async def disconnect(sid):
         room = game_manager.get_room(room_code)
         if room and sid in room.players:
             player_name = room.players[sid].name
-            room.remove_player(sid)
+            # Don't remove player immediately - allow reconnection
+            # Just mark as disconnected
+            room.players[sid].is_connected = False
 
-            # Notify other players
-            await sio.emit('player_left', {
+            # Notify other players about disconnection
+            await sio.emit('player_disconnected', {
                 'player_id': sid,
                 'player_name': player_name,
                 'room_state': room.to_dict()
             }, room=room.room_code)
 
-            # Reset room if empty
-            if len(room.players) == 0:
-                game_manager.reset_room(room_code)
-
-        # Remove from tracking
+        # Remove from socket tracking but keep in room for potential reconnection
         if sid in socket_rooms:
             del socket_rooms[sid]
 
@@ -126,6 +252,10 @@ async def handle_join_game(sid, data):
     if not success:
         await sio.emit('error', {'message': 'Oda dolu! (Maksimum 4 oyuncu)'}, room=sid)
         return
+
+    # Link user_id to player if logged in
+    if sid in socket_users:
+        room.players[sid].user_id = socket_users[sid]
 
     # Track which room this socket is in
     socket_rooms[sid] = room_code
@@ -502,6 +632,10 @@ async def show_final_results(room):
 
     room.phase = GamePhase.GAME_OVER
 
+    # Determine winner
+    leaderboard = room.get_leaderboard()
+    winner_id = leaderboard[0]['socket_id'] if leaderboard else None
+
     # Update game statistics and question statistics
     db = SessionLocal()
     try:
@@ -514,6 +648,11 @@ async def show_final_results(room):
             for player_id in room.players:
                 answers = player_answers[player_id]
                 stats.total_questions_answered += len(answers)
+
+                # Count correct/wrong answers
+                correct_count = sum(1 for a in answers if a['is_correct'])
+                wrong_count = len(answers) - correct_count
+
                 for i, answer in enumerate(answers):
                     if answer['is_correct']:
                         stats.total_correct_answers += 1
@@ -533,6 +672,35 @@ async def show_final_results(room):
                             question_stat.times_correct = (question_stat.times_correct or 0) + 1
                         else:
                             question_stat.times_wrong = (question_stat.times_wrong or 0) + 1
+
+                # Update user statistics if player is logged in
+                player = room.players[player_id]
+                if player.user_id:
+                    # Calculate deception stats
+                    players_deceived = 0
+                    times_deceived = 0
+
+                    for round_data in room.rounds:
+                        # Count how many players voted for this player's fake answer
+                        fake_answer = round_data.fake_answers.get(player_id)
+                        if fake_answer:
+                            votes_for_fake = sum(1 for vote in round_data.votes.values() if vote == fake_answer)
+                            players_deceived += votes_for_fake
+
+                        # Count if this player was deceived (voted for wrong answer)
+                        player_vote = round_data.votes.get(player_id)
+                        if player_vote and player_vote != normalize_answer(round_data.correct_answer):
+                            times_deceived += 1
+
+                    # Update user stats
+                    update_user_stats_after_game(db, player.user_id, {
+                        'won': player_id == winner_id,
+                        'score': player.score,
+                        'correct_answers': correct_count,
+                        'wrong_answers': wrong_count,
+                        'players_deceived': players_deceived,
+                        'times_deceived': times_deceived
+                    })
 
             db.commit()
     finally:
