@@ -192,6 +192,29 @@ async def handle_get_leaderboard(sid, data):
         db.close()
 
 
+async def remove_disconnected_player(sid: str, room_code: str):
+    """Remove player after disconnect timeout"""
+    await asyncio.sleep(15)  # Wait 15 seconds for reconnection
+
+    room = game_manager.get_room(room_code)
+    if room and sid in room.players:
+        # Check if still disconnected
+        if not room.players[sid].is_connected:
+            player_name = room.players[sid].name
+            room.remove_player(sid)
+
+            # Notify other players
+            await sio.emit('player_left', {
+                'player_id': sid,
+                'player_name': player_name,
+                'room_state': room.to_dict()
+            }, room=room_code)
+
+            # Reset room if empty
+            if len(room.players) == 0:
+                game_manager.reset_room(room_code)
+
+
 @sio.event
 async def disconnect(sid):
     """When client disconnects"""
@@ -206,18 +229,36 @@ async def disconnect(sid):
         room = game_manager.get_room(room_code)
         if room and sid in room.players:
             player_name = room.players[sid].name
-            # Don't remove player immediately - allow reconnection
-            # Just mark as disconnected
-            room.players[sid].is_connected = False
 
-            # Notify other players about disconnection
-            await sio.emit('player_disconnected', {
-                'player_id': sid,
-                'player_name': player_name,
-                'room_state': room.to_dict()
-            }, room=room.room_code)
+            # If in lobby (WAITING phase), remove immediately
+            if room.phase == GamePhase.WAITING:
+                room.remove_player(sid)
 
-        # Remove from socket tracking but keep in room for potential reconnection
+                # Notify other players
+                await sio.emit('player_left', {
+                    'player_id': sid,
+                    'player_name': player_name,
+                    'room_state': room.to_dict()
+                }, room=room.room_code)
+
+                # Reset room if empty
+                if len(room.players) == 0:
+                    game_manager.reset_room(room_code)
+            else:
+                # In game - allow reconnection, mark as disconnected
+                room.players[sid].is_connected = False
+
+                # Notify other players about disconnection
+                await sio.emit('player_disconnected', {
+                    'player_id': sid,
+                    'player_name': player_name,
+                    'room_state': room.to_dict()
+                }, room=room.room_code)
+
+                # Schedule removal after 15 seconds if not reconnected
+                create_room_task(room_code, f'remove_player_{sid}', remove_disconnected_player(sid, room_code))
+
+        # Remove from socket tracking
         if sid in socket_rooms:
             del socket_rooms[sid]
 
