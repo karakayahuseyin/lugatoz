@@ -322,43 +322,50 @@
       {#if showRooms}
         <div class="bg-white rounded-2xl shadow-2xl p-8 mb-6">
           <h2 class="text-2xl font-bold text-gray-800 mb-4">
-            Aktif Odalar ({rooms.filter(r => r.players.length > 0).length})
+            Tüm Odalar ({rooms.length})
             <span class="text-sm text-gray-500 font-normal ml-2">(Her 5 saniyede otomatik güncellenir)</span>
           </h2>
 
-          {#if rooms.filter(r => r.players.length > 0).length === 0}
-            <div class="bg-gray-50 p-8 rounded-lg border-2 border-gray-200 text-center">
-              <p class="text-gray-500 text-lg">Şu anda aktif oda yok.</p>
-            </div>
-          {:else}
-            <div class="space-y-4">
-              {#each rooms.filter(r => r.players.length > 0) as room}
-                <div class="bg-gradient-to-r from-orange-50 to-yellow-50 p-6 rounded-lg border-2 border-orange-200">
-                  <div class="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 class="text-xl font-bold text-gray-800 mb-1">{room.room_code}</h3>
-                      <div class="flex gap-3">
-                        <span class="text-sm font-semibold px-3 py-1 rounded-full {
-                          room.phase === 'waiting' ? 'bg-blue-100 text-blue-700' :
-                          room.phase === 'game_over' ? 'bg-gray-100 text-gray-700' :
-                          'bg-green-100 text-green-700'
-                        }">
-                          {getPhaseText(room.phase)}
+          <div class="space-y-4">
+            {#each rooms as room}
+              <div class="bg-gradient-to-r {
+                room.players.length === 0 ? 'from-gray-50 to-gray-100' :
+                room.phase === 'waiting' ? 'from-blue-50 to-cyan-50' :
+                'from-orange-50 to-yellow-50'
+              } p-6 rounded-lg border-2 {
+                room.players.length === 0 ? 'border-gray-200' :
+                room.phase === 'waiting' ? 'border-blue-200' :
+                'border-orange-200'
+              }">
+                <div class="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 class="text-xl font-bold text-gray-800 mb-1">{room.room_code}</h3>
+                    <p class="text-sm text-gray-600 mb-2">{room.name}</p>
+                    <div class="flex gap-3">
+                      <span class="text-sm font-semibold px-3 py-1 rounded-full {
+                        room.phase === 'waiting' ? 'bg-blue-100 text-blue-700' :
+                        room.phase === 'game_over' ? 'bg-gray-100 text-gray-700' :
+                        'bg-green-100 text-green-700'
+                      }">
+                        {getPhaseText(room.phase)}
+                      </span>
+                      {#if room.phase !== 'waiting' && room.phase !== 'game_over' && room.current_round !== null}
+                        <span class="text-sm bg-purple-100 text-purple-700 font-semibold px-3 py-1 rounded-full">
+                          Tur {room.current_round + 1}/{room.max_rounds}
                         </span>
-                        {#if room.phase !== 'waiting' && room.phase !== 'game_over'}
-                          <span class="text-sm bg-purple-100 text-purple-700 font-semibold px-3 py-1 rounded-full">
-                            Tur {room.current_round + 1}/{room.max_rounds}
-                          </span>
-                        {/if}
-                      </div>
-                    </div>
-                    <div class="text-right">
-                      <p class="text-sm text-gray-600">Oyuncu Sayısı</p>
-                      <p class="text-2xl font-bold text-orange-600">{room.players.length}/{room.max_players}</p>
+                      {/if}
                     </div>
                   </div>
+                  <div class="text-right">
+                    <p class="text-sm text-gray-600">Oyuncu Sayısı</p>
+                    <p class="text-2xl font-bold {
+                      room.players.length === 0 ? 'text-gray-400' : 'text-orange-600'
+                    }">{room.players.length}/{room.max_players}</p>
+                  </div>
+                </div>
 
-                  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {#if room.players.length > 0}
+                  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                     {#each room.players as player}
                       <div class="bg-white p-3 rounded-lg border-2 {player.is_host ? 'border-yellow-400' : 'border-gray-200'}">
                         <div class="flex items-center gap-2 mb-1">
@@ -374,17 +381,21 @@
                       </div>
                     {/each}
                   </div>
+                {:else}
+                  <div class="bg-gray-100 p-4 rounded-lg text-center">
+                    <p class="text-gray-500">Oda boş - Oyuncu bekleniyor</p>
+                  </div>
+                {/if}
 
-                  {#if room.current_question}
-                    <div class="mt-4 bg-white p-4 rounded-lg border-2 border-cyan-200">
-                      <p class="text-xs text-gray-500 mb-1">Şu Anki Soru:</p>
-                      <p class="text-sm font-semibold text-gray-800">{room.current_question}</p>
-                    </div>
-                  {/if}
-                </div>
-              {/each}
-            </div>
-          {/if}
+                {#if room.current_question}
+                  <div class="bg-white p-4 rounded-lg border-2 border-cyan-200">
+                    <p class="text-xs text-gray-500 mb-1">Şu Anki Soru:</p>
+                    <p class="text-sm font-semibold text-gray-800">{room.current_question}</p>
+                  </div>
+                {/if}
+              </div>
+            {/each}
+          </div>
         </div>
       {/if}
 

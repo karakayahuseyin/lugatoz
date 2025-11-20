@@ -473,14 +473,36 @@ class GameManager:
                 (room.phase == GamePhase.WAITING and len(room.players) < room.max_players) or
                 (room.phase == GamePhase.GAME_OVER and len(room.players) < room.max_players)
             )
+
+            # Get current question text if in game
+            current_question = None
+            if room.phase in [GamePhase.SUBMITTING_FAKE, GamePhase.VOTING, GamePhase.SHOWING_RESULTS]:
+                if room.current_round < len(room.rounds):
+                    current_question = room.rounds[room.current_round].question_text
+
+            # Build player list
+            players_list = []
+            for player_id, player in room.players.items():
+                players_list.append({
+                    "socket_id": player_id,
+                    "name": player.name,
+                    "score": player.score,
+                    "is_host": player.is_host,
+                    "is_connected": player.is_connected,
+                    "color": player.color
+                })
+
             rooms_status.append({
-                "code": room_info["code"],
+                "room_code": room_info["code"],
                 "name": room_info["name"],
                 "description": room_info["description"],
-                "players": len(room.players),
+                "players": players_list,
                 "max_players": room.max_players,
                 "phase": room.phase.value,
-                "available": is_available
+                "available": is_available,
+                "current_round": room.current_round if room.phase != GamePhase.WAITING else None,
+                "max_rounds": room.max_rounds if room.phase != GamePhase.WAITING else None,
+                "current_question": current_question
             })
         return rooms_status
 
