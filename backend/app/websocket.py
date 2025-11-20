@@ -5,7 +5,7 @@ from typing import Dict
 from .game_manager import game_manager, GamePhase, check_answer, Player, GameManager
 from .database import SessionLocal
 from .models import Question, GameStats, QuestionStats, User, UserStats
-from .auth import create_user, get_user_by_id, get_user_by_username, update_username, update_last_login, get_leaderboard, update_user_stats_after_game
+from .auth import create_user, get_user_by_id, get_user_by_username, update_username, update_last_login, get_leaderboard, get_user_stats, update_user_stats_after_game
 from datetime import datetime
 
 # Create Socket.IO server

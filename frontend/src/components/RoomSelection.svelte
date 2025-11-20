@@ -18,6 +18,13 @@
 
   onMount(async () => {
     await loadRooms();
+
+    // Cleanup on unmount
+    return () => {
+      const socket = socketManager.getSocket();
+      socket.off('user_stats_data');
+      socket.off('user_stats_error');
+    };
   });
 
   async function loadRooms() {
@@ -60,8 +67,17 @@
     loadingStats = true;
     const socket = socketManager.getSocket();
 
-    socket.once('user_stats_data', (data) => {
+    // Remove any existing listeners to avoid duplicates
+    socket.off('user_stats_data');
+    socket.off('user_stats_error');
+
+    socket.on('user_stats_data', (data) => {
       userStats = data.stats;
+      loadingStats = false;
+    });
+
+    socket.on('user_stats_error', (data) => {
+      console.error('İstatistik hatası:', data.message);
       loadingStats = false;
     });
 
