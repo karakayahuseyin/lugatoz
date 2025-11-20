@@ -111,7 +111,7 @@
         >
           <div class="flex justify-between items-start mb-3">
             <div>
-              <p class="text-xs text-gray-500 font-mono">{room.room_code}</p>
+              <h3 class="font-semibold text-base text-gray-800">{room.name}</h3>
             </div>
             <div class="flex items-center gap-2">
               <span class="text-sm {room.available ? 'text-cyan-600' : 'text-gray-500'} font-semibold">
@@ -120,10 +120,6 @@
               <span class="w-3 h-3 rounded-full {room.available ? 'bg-green-500' : 'bg-red-500'}"></span>
             </div>
           </div>
-
-          <p class="text-xs text-gray-600 mb-3 line-clamp-2">
-            {room.description}
-          </p>
 
           <div class="flex justify-between items-center">
             <span class="text-xs px-2 py-1 rounded-full {

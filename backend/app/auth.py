@@ -76,8 +76,20 @@ def update_last_login(db: Session, user_id: int):
 
 
 def get_user_stats(db: Session, user_id: int) -> Optional[UserStats]:
-    """Get user statistics"""
-    return db.query(UserStats).filter(UserStats.user_id == user_id).first()
+    """Get user statistics - creates if doesn't exist"""
+    stats = db.query(UserStats).filter(UserStats.user_id == user_id).first()
+
+    # If stats don't exist, create them (for users created before stats feature)
+    if not stats:
+        # Verify user exists
+        user = db.query(User).filter(User.user_id == user_id).first()
+        if user:
+            stats = UserStats(user_id=user_id)
+            db.add(stats)
+            db.commit()
+            db.refresh(stats)
+
+    return stats
 
 
 def get_leaderboard(db: Session, limit: int = 100) -> list:
