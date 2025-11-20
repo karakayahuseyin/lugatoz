@@ -91,7 +91,6 @@
                 <div class="flex-1">
                   <div class="flex items-center gap-2 mb-1">
                     <h3 class="text-xl font-bold text-gray-800">{player.username}</h3>
-                    <span class="text-sm text-gray-500">#{player.user_id}</span>
                   </div>
 
                   <!-- Stats Grid -->
