@@ -192,6 +192,39 @@ async def handle_get_leaderboard(sid, data):
         db.close()
 
 
+@sio.on('get_user_stats')
+async def handle_get_user_stats(sid, data):
+    """Get stats for a specific user"""
+    user_id = data.get('user_id')
+
+    if not user_id:
+        await sio.emit('user_stats_error', {'message': 'Kullanıcı ID gerekli!'}, room=sid)
+        return
+
+    db = SessionLocal()
+    try:
+        stats = get_user_stats(db, user_id)
+        if not stats:
+            await sio.emit('user_stats_error', {'message': 'İstatistik bulunamadı!'}, room=sid)
+            return
+
+        await sio.emit('user_stats_data', {
+            'stats': {
+                'total_games_played': stats.total_games_played,
+                'total_games_won': stats.total_games_won,
+                'total_score': stats.total_score,
+                'highest_score': stats.highest_score,
+                'total_questions_answered': stats.total_questions_answered,
+                'total_correct_answers': stats.total_correct_answers,
+                'total_wrong_answers': stats.total_wrong_answers,
+                'total_players_deceived': stats.total_players_deceived,
+                'total_times_deceived': stats.total_times_deceived
+            }
+        }, room=sid)
+    finally:
+        db.close()
+
+
 async def remove_disconnected_player(sid: str, room_code: str):
     """Remove player after disconnect timeout"""
     await asyncio.sleep(15)  # Wait 15 seconds for reconnection

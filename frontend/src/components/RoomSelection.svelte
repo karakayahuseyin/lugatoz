@@ -1,6 +1,8 @@
 <script>
   import { onMount } from 'svelte';
   import HowToPlay from './HowToPlay.svelte';
+  import { userStore } from '../stores/userStore';
+  import { socketManager } from '../utils/socket';
 
   export let playerName = '';
   export let onRoomSelect = () => {};
@@ -8,6 +10,11 @@
   let rooms = [];
   let loading = true;
   let showHowToPlay = false;
+  let showStats = false;
+  let userStats = null;
+  let loadingStats = false;
+
+  $: userId = $userStore.userId;
 
   onMount(async () => {
     await loadRooms();
@@ -38,6 +45,44 @@
 
   function toggleHowToPlay() {
     showHowToPlay = !showHowToPlay;
+  }
+
+  function toggleStats() {
+    showStats = !showStats;
+    if (showStats && !userStats && userId) {
+      loadUserStats();
+    }
+  }
+
+  function loadUserStats() {
+    if (!userId) return;
+
+    loadingStats = true;
+    const socket = socketManager.getSocket();
+
+    socket.once('user_stats_data', (data) => {
+      userStats = data.stats;
+      loadingStats = false;
+    });
+
+    socketManager.emit('get_user_stats', { user_id: userId });
+  }
+
+  function getWinRate() {
+    if (!userStats || userStats.total_games_played === 0) return 0;
+    return Math.round((userStats.total_games_won / userStats.total_games_played) * 100);
+  }
+
+  function getAccuracy() {
+    if (!userStats || userStats.total_questions_answered === 0) return 0;
+    return Math.round((userStats.total_correct_answers / userStats.total_questions_answered) * 100);
+  }
+
+  function getDeceptionRate() {
+    if (!userStats || userStats.total_players_deceived === 0) return 0;
+    const totalDeceptionAttempts = userStats.total_players_deceived + userStats.total_times_deceived;
+    if (totalDeceptionAttempts === 0) return 0;
+    return Math.round((userStats.total_players_deceived / totalDeceptionAttempts) * 100);
   }
 </script>
 
@@ -112,6 +157,15 @@
       <span>🔄</span>
       Yenile
     </button>
+    {#if userId}
+      <button
+        on:click={toggleStats}
+        class="text-cyan-600 hover:text-cyan-700 font-semibold text-sm inline-flex items-center gap-1"
+      >
+        <span>📊</span>
+        İstatistiklerim
+      </button>
+    {/if}
     <button
       on:click={toggleHowToPlay}
       class="text-cyan-600 hover:text-cyan-700 font-semibold text-sm inline-flex items-center gap-1"
@@ -124,4 +178,122 @@
 
 {#if showHowToPlay}
   <HowToPlay onClose={toggleHowToPlay} />
+{/if}
+
+{#if showStats}
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" on:click={toggleStats} role="dialog" aria-modal="true">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl" on:click|stopPropagation role="document">
+      <!-- Header -->
+      <div class="bg-gradient-to-r from-purple-500 to-pink-500 p-6 text-white">
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-3xl font-bold">📊 İstatistiklerim</h2>
+            <p class="text-purple-50 mt-1">{playerName}</p>
+            <p class="text-xs text-purple-100 mt-0.5">ID: {userId}</p>
+          </div>
+          <button
+            on:click={toggleStats}
+            class="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
+            aria-label="Kapat"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Content -->
+      <div class="p-6 overflow-y-auto" style="max-height: calc(90vh - 140px);">
+        {#if loadingStats}
+          <div class="text-center py-12">
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+            <p class="text-gray-600 mt-4">İstatistikler yükleniyor...</p>
+          </div>
+        {:else if userStats}
+          <div class="space-y-4">
+            <!-- Genel İstatistikler -->
+            <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 border-2 border-purple-200">
+              <h3 class="text-lg font-bold text-gray-800 mb-3">🎮 Genel</h3>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="bg-white rounded-lg p-3">
+                  <p class="text-xs text-gray-600">Toplam Puan</p>
+                  <p class="text-2xl font-bold text-purple-600">{userStats.total_score.toLocaleString()}</p>
+                </div>
+                <div class="bg-white rounded-lg p-3">
+                  <p class="text-xs text-gray-600">En Yüksek Skor</p>
+                  <p class="text-2xl font-bold text-pink-600">{userStats.highest_score.toLocaleString()}</p>
+                </div>
+                <div class="bg-white rounded-lg p-3">
+                  <p class="text-xs text-gray-600">Oynanan Oyun</p>
+                  <p class="text-2xl font-bold text-gray-700">{userStats.total_games_played}</p>
+                </div>
+                <div class="bg-white rounded-lg p-3">
+                  <p class="text-xs text-gray-600">Kazanılan Oyun</p>
+                  <p class="text-2xl font-bold text-green-600">{userStats.total_games_won}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Başarı Oranları -->
+            <div class="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-xl p-4 border-2 border-cyan-200">
+              <h3 class="text-lg font-bold text-gray-800 mb-3">📈 Başarı Oranları</h3>
+              <div class="grid grid-cols-3 gap-3">
+                <div class="bg-white rounded-lg p-3 text-center">
+                  <p class="text-xs text-gray-600 mb-1">Kazanma</p>
+                  <p class="text-3xl font-bold text-green-600">{getWinRate()}%</p>
+                </div>
+                <div class="bg-white rounded-lg p-3 text-center">
+                  <p class="text-xs text-gray-600 mb-1">Doğruluk</p>
+                  <p class="text-3xl font-bold text-blue-600">{getAccuracy()}%</p>
+                </div>
+                <div class="bg-white rounded-lg p-3 text-center">
+                  <p class="text-xs text-gray-600 mb-1">Yanıltma</p>
+                  <p class="text-3xl font-bold text-orange-600">{getDeceptionRate()}%</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Soru İstatistikleri -->
+            <div class="bg-gradient-to-r from-green-50 to-lime-50 rounded-xl p-4 border-2 border-green-200">
+              <h3 class="text-lg font-bold text-gray-800 mb-3">❓ Sorular</h3>
+              <div class="grid grid-cols-3 gap-3">
+                <div class="bg-white rounded-lg p-3">
+                  <p class="text-xs text-gray-600">Toplam Soru</p>
+                  <p class="text-xl font-bold text-gray-700">{userStats.total_questions_answered}</p>
+                </div>
+                <div class="bg-white rounded-lg p-3">
+                  <p class="text-xs text-gray-600">Doğru</p>
+                  <p class="text-xl font-bold text-green-600">{userStats.total_correct_answers}</p>
+                </div>
+                <div class="bg-white rounded-lg p-3">
+                  <p class="text-xs text-gray-600">Yanlış</p>
+                  <p class="text-xl font-bold text-red-600">{userStats.total_wrong_answers}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Yanıltma İstatistikleri -->
+            <div class="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl p-4 border-2 border-orange-200">
+              <h3 class="text-lg font-bold text-gray-800 mb-3">🎭 Yanıltma</h3>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="bg-white rounded-lg p-3">
+                  <p class="text-xs text-gray-600">Yanılttığım Oyuncu</p>
+                  <p class="text-2xl font-bold text-orange-600">{userStats.total_players_deceived}</p>
+                </div>
+                <div class="bg-white rounded-lg p-3">
+                  <p class="text-xs text-gray-600">Yanıldığım Sayı</p>
+                  <p class="text-2xl font-bold text-yellow-600">{userStats.total_times_deceived}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        {:else}
+          <div class="text-center py-12">
+            <p class="text-gray-600 text-lg">İstatistik verisi bulunamadı</p>
+          </div>
+        {/if}
+      </div>
+    </div>
+  </div>
 {/if}
