@@ -7,7 +7,7 @@ from typing import List
 from pydantic import BaseModel
 
 from .database import get_db, init_db
-from .models import Question, GameStats, QuestionStats
+from .models import Question, GameStats, QuestionStats, User, UserStats
 from .websocket import socket_app
 
 # FastAPI uygulaması
@@ -202,6 +202,31 @@ async def get_rooms():
     """Tüm odaları listele"""
     from .game_manager import game_manager
     return game_manager.get_all_rooms()
+
+
+@app.get("/api/users")
+async def get_users(db: Session = Depends(get_db)):
+    """Tüm kullanıcıları listele (Admin için)"""
+    users = db.query(User).join(UserStats).order_by(User.user_id.desc()).all()
+
+    result = []
+    for user in users:
+        result.append({
+            'user_id': user.user_id,
+            'username': user.username,
+            'created_at': user.created_at.isoformat() if user.created_at else None,
+            'last_login': user.last_login.isoformat() if user.last_login else None,
+            'stats': {
+                'total_games_played': user.stats.total_games_played,
+                'total_games_won': user.stats.total_games_won,
+                'total_score': user.stats.total_score,
+                'highest_score': user.stats.highest_score,
+                'total_correct_answers': user.stats.total_correct_answers,
+                'total_questions_answered': user.stats.total_questions_answered
+            } if user.stats else None
+        })
+
+    return result
 
 
 # Socket.IO'yu FastAPI'ye mount et

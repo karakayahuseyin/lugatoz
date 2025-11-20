@@ -7,6 +7,8 @@
   let isAuthenticated = false;
   let passwordInput = '';
   let stats = null;
+  let users = [];
+  let showUsers = false;
 
   const ADMIN_PASSWORD = 'lugatoz23';
 
@@ -21,9 +23,22 @@
       isAuthenticated = true;
       loadQuestions();
       loadStats();
+      loadUsers();
     } else {
       alert('Yanlış şifre!');
       passwordInput = '';
+    }
+  }
+
+  async function loadUsers() {
+    try {
+      const response = await fetch('/api/users');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      users = await response.json();
+    } catch (error) {
+      console.error('Kullanıcılar yüklenemedi:', error);
     }
   }
 
@@ -247,7 +262,7 @@
         </div>
       {/if}
 
-      <div class="grid grid-cols-2 gap-4 mb-6">
+      <div class="grid grid-cols-3 gap-4 mb-6">
         <div class="bg-cyan-50 p-4 rounded-lg border-2 border-cyan-200">
           <p class="text-cyan-600 font-semibold">Toplam Soru</p>
           <p class="text-3xl font-bold text-cyan-700">{questions.length}</p>
@@ -258,7 +273,79 @@
             {questions.filter(q => q.is_active).length}
           </p>
         </div>
+        <div class="bg-purple-50 p-4 rounded-lg border-2 border-purple-200">
+          <p class="text-purple-600 font-semibold">Kayıtlı Kullanıcı</p>
+          <p class="text-3xl font-bold text-purple-700">{users.length}</p>
+        </div>
       </div>
+
+      <button
+        on:click={() => showUsers = !showUsers}
+        class="btn btn-primary mb-4"
+      >
+        {showUsers ? 'Kullanıcı Listesini Gizle' : 'Tüm Kullanıcıları Göster'}
+      </button>
+
+      {#if showUsers}
+        <div class="bg-white rounded-2xl shadow-2xl p-8 mb-6">
+          <h2 class="text-2xl font-bold text-gray-800 mb-4">Tüm Kullanıcılar ({users.length})</h2>
+
+          {#if users.length === 0}
+            <div class="bg-gray-50 p-8 rounded-lg border-2 border-gray-200 text-center">
+              <p class="text-gray-500 text-lg">Henüz kayıtlı kullanıcı yok.</p>
+            </div>
+          {:else}
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kullanıcı Adı</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Oyun</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kazanma</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Toplam Puan</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">En Yüksek</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doğruluk</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Son Giriş</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  {#each users as user}
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="text-sm font-bold text-primary">{user.user_id}</span>
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="text-sm font-medium text-gray-900">{user.username}</span>
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {user.stats?.total_games_played || 0}
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {user.stats?.total_games_won || 0}
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-cyan-600">
+                        {user.stats?.total_score?.toLocaleString() || 0}
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-lime-600">
+                        {user.stats?.highest_score?.toLocaleString() || 0}
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {user.stats?.total_questions_answered > 0
+                          ? ((user.stats.total_correct_answers / user.stats.total_questions_answered) * 100).toFixed(1)
+                          : 0}%
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(user.last_login).toLocaleString('tr-TR')}
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          {/if}
+        </div>
+      {/if}
 
       <button
         on:click={() => showAddForm = !showAddForm}
