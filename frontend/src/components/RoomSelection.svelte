@@ -121,6 +121,10 @@
             </div>
           </div>
 
+          <p class="text-xs text-gray-600 mb-3 line-clamp-2">
+            {room.description}
+          </p>
+
           <div class="flex justify-between items-center">
             <span class="text-xs px-2 py-1 rounded-full {
               room.phase === 'waiting' ? 'bg-cyan-100 text-cyan-700' : 'bg-yellow-100 text-yellow-700'
