@@ -31,6 +31,11 @@
     onRoomSelect(roomCode);
   }
 
+  function refreshRooms() {
+    loading = true;
+    loadRooms();
+  }
+
   function toggleHowToPlay() {
     showHowToPlay = !showHowToPlay;
   }
@@ -51,7 +56,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       {#each rooms as room}
         <button
-          on:click={() => selectRoom(room.code)}
+          on:click={() => selectRoom(room.room_code)}
           disabled={!room.available}
           class="text-left p-6 rounded-lg border-2 transition-all {
             room.available
@@ -60,10 +65,13 @@
           }"
         >
           <div class="flex justify-between items-start mb-3">
-            <h3 class="font-bold text-lg text-gray-800">{room.name}</h3>
+            <div>
+              <h3 class="font-bold text-lg text-gray-800">{room.name}</h3>
+              <p class="text-xs text-gray-500 font-mono">{room.room_code}</p>
+            </div>
             <div class="flex items-center gap-2">
               <span class="text-sm {room.available ? 'text-cyan-600' : 'text-gray-500'} font-semibold">
-                {room.players}/{room.max_players}
+                {room.players.length}/{room.max_players}
               </span>
               <span class="w-3 h-3 rounded-full {room.available ? 'bg-green-500' : 'bg-red-500'}"></span>
             </div>
@@ -83,7 +91,7 @@
             {#if room.available}
               <span class="text-cyan-600 font-semibold text-sm">Katıl →</span>
             {:else}
-              <span class="text-gray-400 text-sm">Dolu</span>
+              <span class="text-gray-400 text-sm">{room.phase === 'waiting' ? 'Dolu' : 'Oyun devam ediyor'}</span>
             {/if}
           </div>
         </button>
@@ -97,6 +105,13 @@
       class="text-cyan-600 hover:text-cyan-700 font-semibold text-sm"
     >
       ← Geri Dön
+    </button>
+    <button
+      on:click={refreshRooms}
+      class="text-cyan-600 hover:text-cyan-700 font-semibold text-sm inline-flex items-center gap-1"
+    >
+      <span>🔄</span>
+      Yenile
     </button>
     <button
       on:click={toggleHowToPlay}
