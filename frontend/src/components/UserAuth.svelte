@@ -88,9 +88,16 @@
   function skipAuth() {
     onComplete();
   }
+
+  function handleClose() {
+    if (!isProcessing) {
+      onComplete();
+    }
+  }
 </script>
 
-<div class="card max-w-md w-full">
+<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" on:click={handleClose} role="dialog" aria-modal="true">
+  <div class="card max-w-md w-full" on:click|stopPropagation role="document">
   <div class="text-center mb-6">
     <h2 class="text-3xl font-bold text-primary mb-2">
       {mode === 'register' ? 'Hesap Oluştur' : 'Giriş Yap'}
@@ -151,5 +158,6 @@
     >
       Misafir olarak devam et (istatistikler kaydedilmez)
     </button>
+  </div>
   </div>
 </div>
