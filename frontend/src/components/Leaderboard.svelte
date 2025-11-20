@@ -15,8 +15,8 @@
       isLoading = false;
     });
 
-    // Request leaderboard
-    socketManager.emit('get_leaderboard', { limit: 100 });
+    // Request leaderboard - top 10 only
+    socketManager.emit('get_leaderboard', { limit: 10 });
 
     return () => {
       socket.off('leaderboard_data');
@@ -48,7 +48,7 @@
       <div class="flex justify-between items-center">
         <div>
           <h2 class="text-3xl font-bold">🏆 Global Liderlik Tablosu</h2>
-          <p class="text-cyan-50 mt-1">En başarılı oyuncular</p>
+          <p class="text-cyan-50 mt-1">En başarılı 10 oyuncu</p>
         </div>
         <button
           on:click={onClose}
