@@ -722,12 +722,21 @@ async def auto_finish_final_test(room_code):
 
     room = game_manager.get_room(room_code)
 
+    if not room:
+        return
+
     # Check if we're still in final test (in case already finished)
     if room.phase != GamePhase.FINAL_TEST:
         return
 
     # Show final results to all players
-    await show_final_results(room)
+    try:
+        await show_final_results(room)
+    except Exception as e:
+        print(f"[ERROR] auto_finish_final_test failed: {e}")
+        # Force game over state
+        room.phase = GamePhase.GAME_OVER
+        await sio.emit('error', {'message': 'Sonuçlar hesaplanırken hata oluştu.'}, room=room_code)
 
 
 async def auto_reset_room(room_code):
@@ -763,6 +772,13 @@ async def handle_submit_final_answer(sid, data):
     answer = data.get('answer', '').strip()
     room = get_player_room(sid)
 
+    if not room:
+        await sio.emit('error', {'message': 'Oda bulunamadı! Lütfen sayfayı yenileyin.'}, room=sid)
+        return
+
+    if room.phase != GamePhase.FINAL_TEST:
+        return
+
     success = room.submit_final_answer(sid, question_index, answer)
 
     if not success:
@@ -783,7 +799,12 @@ async def handle_submit_final_answer(sid, data):
 
     # If all players completed, show results
     if all_completed:
-        await show_final_results(room)
+        try:
+            await show_final_results(room)
+        except Exception as e:
+            print(f"[ERROR] show_final_results failed: {e}")
+            room.phase = GamePhase.GAME_OVER
+            await sio.emit('error', {'message': 'Sonuçlar hesaplanırken hata oluştu.'}, room=room.room_code)
 
 
 async def show_final_results(room):
@@ -829,76 +850,82 @@ async def show_final_results(room):
     leaderboard = room.get_leaderboard()
     winner_id = leaderboard[0]['socket_id'] if leaderboard else None
 
-    # Update game statistics and question statistics
-    db = SessionLocal()
+    # Update game statistics and question statistics (non-blocking)
     try:
-        # Update global game stats if exists
-        stats = db.query(GameStats).first()
-        if stats:
-            stats.completed_sessions += 1
-            stats.total_players += len(room.players)
-
-        # Process each player's final test answers and stats
-        for player_id in room.players:
-            player = room.players[player_id]
-            answers = player_answers[player_id]
-
-            # Count correct/wrong answers from final test only
-            correct_count = sum(1 for a in answers if a['is_correct'])
-            wrong_count = len(answers) - correct_count
-
-            # Update global stats if exists
+        db = SessionLocal()
+        try:
+            # Update global game stats if exists
+            stats = db.query(GameStats).first()
             if stats:
-                stats.total_questions_answered += len(answers)
-                stats.total_correct_answers += correct_count
-                stats.total_wrong_answers += wrong_count
+                stats.completed_sessions += 1
+                stats.total_players += len(room.players)
 
-            # Update question-specific stats (final test only)
-            for i, answer in enumerate(answers):
-                question_id = room.questions[i]['id']
-                question_stat = db.query(QuestionStats).filter(
-                    QuestionStats.question_id == question_id
-                ).first()
+            # Process each player's final test answers and stats
+            for player_id in room.players:
+                player = room.players[player_id]
+                answers = player_answers.get(player_id, [])
 
-                if question_stat:
-                    question_stat.times_asked = (question_stat.times_asked or 0) + 1
-                    if answer['is_correct']:
-                        question_stat.times_correct = (question_stat.times_correct or 0) + 1
-                    else:
-                        question_stat.times_wrong = (question_stat.times_wrong or 0) + 1
+                # Count correct/wrong answers from final test only
+                correct_count = sum(1 for a in answers if a.get('is_correct'))
+                wrong_count = len(answers) - correct_count
 
-            # Update user statistics if player is logged in
-            print(f"[STATS] Player {player.name}: user_id={player.user_id}")
-            if player.user_id:
-                # Calculate deception stats from normal rounds
-                players_deceived = 0
-                times_deceived = 0
+                # Update global stats if exists
+                if stats:
+                    stats.total_questions_answered += len(answers)
+                    stats.total_correct_answers += correct_count
+                    stats.total_wrong_answers += wrong_count
 
-                for round_data in room.rounds:
-                    # Count how many players voted for this player's fake answer
-                    fake_answer = round_data.fake_answers.get(player_id)
-                    if fake_answer:
-                        votes_for_fake = sum(1 for vote in round_data.votes.values() if vote == fake_answer)
-                        players_deceived += votes_for_fake
+                # Update question-specific stats (final test only)
+                for i, answer in enumerate(answers):
+                    if i < len(room.questions):
+                        question_id = room.questions[i].get('id')
+                        if question_id:
+                            question_stat = db.query(QuestionStats).filter(
+                                QuestionStats.question_id == question_id
+                            ).first()
 
-                    # Count if this player was deceived (voted for wrong answer)
-                    player_vote = round_data.votes.get(player_id)
-                    if player_vote and player_vote != normalize_answer(round_data.correct_answer):
-                        times_deceived += 1
+                            if question_stat:
+                                question_stat.times_asked = (question_stat.times_asked or 0) + 1
+                                if answer.get('is_correct'):
+                                    question_stat.times_correct = (question_stat.times_correct or 0) + 1
+                                else:
+                                    question_stat.times_wrong = (question_stat.times_wrong or 0) + 1
 
-                # Update user stats (final test results only for correct/wrong)
-                update_user_stats_after_game(db, player.user_id, {
-                    'won': player_id == winner_id,
-                    'score': player.score,
-                    'correct_answers': correct_count,
-                    'wrong_answers': wrong_count,
-                    'players_deceived': players_deceived,
-                    'times_deceived': times_deceived
-                })
+                # Update user statistics if player is logged in
+                print(f"[STATS] Player {player.name}: user_id={player.user_id}")
+                if player.user_id:
+                    # Calculate deception stats from normal rounds
+                    players_deceived = 0
+                    times_deceived = 0
 
-        db.commit()
-    finally:
-        db.close()
+                    for round_data in room.rounds:
+                        # Count how many players voted for this player's fake answer
+                        fake_answer = round_data.fake_answers.get(player_id)
+                        if fake_answer:
+                            votes_for_fake = sum(1 for vote in round_data.votes.values() if vote == fake_answer)
+                            players_deceived += votes_for_fake
+
+                        # Count if this player was deceived (voted for wrong answer)
+                        player_vote = round_data.votes.get(player_id)
+                        if player_vote and round_data.correct_answer:
+                            if player_vote != normalize_answer(round_data.correct_answer):
+                                times_deceived += 1
+
+                    # Update user stats (final test results only for correct/wrong)
+                    update_user_stats_after_game(db, player.user_id, {
+                        'won': player_id == winner_id,
+                        'score': player.score,
+                        'correct_answers': correct_count,
+                        'wrong_answers': wrong_count,
+                        'players_deceived': players_deceived,
+                        'times_deceived': times_deceived
+                    })
+
+            db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"[ERROR] Failed to update stats in show_final_results: {e}")
 
     # Send results with the same questions list
     await sio.emit('game_over', {
