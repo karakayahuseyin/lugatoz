@@ -312,7 +312,25 @@ async def handle_join_game(sid, data):
         await sio.emit('error', {'message': 'Oyun zaten başladı!'}, room=sid)
         return
 
-    # Check if name already exists
+    # Check if player is already in another room and remove them
+    if sid in socket_rooms:
+        old_room_code = socket_rooms[sid]
+        if old_room_code != room_code:
+            old_room = game_manager.get_room(old_room_code)
+            if old_room and sid in old_room.players:
+                old_player_name = old_room.players[sid].name
+                old_room.remove_player(sid)
+                await sio.leave_room(sid, old_room_code)
+                await sio.emit('player_left', {
+                    'player_id': sid,
+                    'player_name': old_player_name,
+                    'room_state': old_room.to_dict()
+                }, room=old_room_code)
+                # Reset old room if empty
+                if len(old_room.players) == 0:
+                    game_manager.reset_room(old_room_code)
+
+    # Check if name already exists in the new room
     existing_names = [p.name.lower() for p in room.players.values()]
     if player_name.lower() in existing_names:
         await sio.emit('name_taken', {
@@ -713,70 +731,70 @@ async def show_final_results(room):
     # Update game statistics and question statistics
     db = SessionLocal()
     try:
+        # Update global game stats if exists
         stats = db.query(GameStats).first()
         if stats:
             stats.completed_sessions += 1
             stats.total_players += len(room.players)
 
-            # Count total questions answered and correct/wrong per player
-            for player_id in room.players:
-                answers = player_answers[player_id]
+        # Process each player's answers and stats
+        for player_id in room.players:
+            answers = player_answers[player_id]
+
+            # Count correct/wrong answers
+            correct_count = sum(1 for a in answers if a['is_correct'])
+            wrong_count = len(answers) - correct_count
+
+            # Update global stats if exists
+            if stats:
                 stats.total_questions_answered += len(answers)
+                stats.total_correct_answers += correct_count
+                stats.total_wrong_answers += wrong_count
 
-                # Count correct/wrong answers
-                correct_count = sum(1 for a in answers if a['is_correct'])
-                wrong_count = len(answers) - correct_count
+            # Update question-specific stats
+            for i, answer in enumerate(answers):
+                question_id = room.questions[i]['id']
+                question_stat = db.query(QuestionStats).filter(
+                    QuestionStats.question_id == question_id
+                ).first()
 
-                for i, answer in enumerate(answers):
+                if question_stat:
+                    question_stat.times_asked = (question_stat.times_asked or 0) + 1
                     if answer['is_correct']:
-                        stats.total_correct_answers += 1
+                        question_stat.times_correct = (question_stat.times_correct or 0) + 1
                     else:
-                        stats.total_wrong_answers += 1
+                        question_stat.times_wrong = (question_stat.times_wrong or 0) + 1
 
-                    # Update question-specific stats
-                    question_id = room.questions[i]['id']
-                    question_stat = db.query(QuestionStats).filter(
-                        QuestionStats.question_id == question_id
-                    ).first()
+            # Update user statistics if player is logged in
+            player = room.players[player_id]
+            if player.user_id:
+                # Calculate deception stats
+                players_deceived = 0
+                times_deceived = 0
 
-                    if question_stat:
-                        # times_asked increases per player (not per game)
-                        question_stat.times_asked = (question_stat.times_asked or 0) + 1
-                        if answer['is_correct']:
-                            question_stat.times_correct = (question_stat.times_correct or 0) + 1
-                        else:
-                            question_stat.times_wrong = (question_stat.times_wrong or 0) + 1
+                for round_data in room.rounds:
+                    # Count how many players voted for this player's fake answer
+                    fake_answer = round_data.fake_answers.get(player_id)
+                    if fake_answer:
+                        votes_for_fake = sum(1 for vote in round_data.votes.values() if vote == fake_answer)
+                        players_deceived += votes_for_fake
 
-                # Update user statistics if player is logged in
-                player = room.players[player_id]
-                if player.user_id:
-                    # Calculate deception stats
-                    players_deceived = 0
-                    times_deceived = 0
+                    # Count if this player was deceived (voted for wrong answer)
+                    player_vote = round_data.votes.get(player_id)
+                    if player_vote and player_vote != normalize_answer(round_data.correct_answer):
+                        times_deceived += 1
 
-                    for round_data in room.rounds:
-                        # Count how many players voted for this player's fake answer
-                        fake_answer = round_data.fake_answers.get(player_id)
-                        if fake_answer:
-                            votes_for_fake = sum(1 for vote in round_data.votes.values() if vote == fake_answer)
-                            players_deceived += votes_for_fake
+                # Update user stats
+                update_user_stats_after_game(db, player.user_id, {
+                    'won': player_id == winner_id,
+                    'score': player.score,
+                    'correct_answers': correct_count,
+                    'wrong_answers': wrong_count,
+                    'players_deceived': players_deceived,
+                    'times_deceived': times_deceived
+                })
 
-                        # Count if this player was deceived (voted for wrong answer)
-                        player_vote = round_data.votes.get(player_id)
-                        if player_vote and player_vote != normalize_answer(round_data.correct_answer):
-                            times_deceived += 1
-
-                    # Update user stats
-                    update_user_stats_after_game(db, player.user_id, {
-                        'won': player_id == winner_id,
-                        'score': player.score,
-                        'correct_answers': correct_count,
-                        'wrong_answers': wrong_count,
-                        'players_deceived': players_deceived,
-                        'times_deceived': times_deceived
-                    })
-
-            db.commit()
+        db.commit()
     finally:
         db.close()
 
