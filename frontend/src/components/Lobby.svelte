@@ -1,5 +1,5 @@
 <script>
-  import { gameState } from '../stores/gameStore';
+  import { gameState, updateGameState } from '../stores/gameStore';
   import { socketManager } from '../utils/socket';
   import HowToPlay from './HowToPlay.svelte';
   import { getPlayerColor } from '../utils/colors';
@@ -8,6 +8,14 @@
 
   function startGame() {
     socketManager.emit('start_game', {});
+  }
+
+  function leaveRoom() {
+    socketManager.emit('leave_room', {});
+    socketManager.clearRoomInfo();
+    updateGameState({ phase: 'home', players: [], isHost: false });
+    // Oda seçim ekranını göstermek için sayfayı yenile
+    window.location.reload();
   }
 
   function toggleHowToPlay() {
@@ -63,7 +71,14 @@
     </div>
   {/if}
 
-  <div class="mt-6 pt-6 border-t border-gray-200 text-center">
+  <div class="mt-6 pt-6 border-t border-gray-200 flex justify-center gap-6">
+    <button
+      on:click={leaveRoom}
+      class="text-red-500 hover:text-red-600 font-semibold text-sm inline-flex items-center gap-1"
+    >
+      <span>←</span>
+      Odadan Ayrıl
+    </button>
     <button
       on:click={toggleHowToPlay}
       class="text-cyan-600 hover:text-cyan-700 font-semibold text-sm inline-flex items-center gap-1"
