@@ -788,6 +788,8 @@ async def handle_submit_final_answer(sid, data):
 
 async def show_final_results(room):
     """Calculate and show final results to all players"""
+    from .game_manager import normalize_answer
+
     final_scores = {}
     player_answers = {}
 
