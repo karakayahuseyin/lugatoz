@@ -41,7 +41,9 @@
   }
 </script>
 
+<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" on:click={onClose} on:keydown={(e) => e.key === 'Escape' && onClose()} role="dialog" aria-modal="true" tabindex="-1">
+  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
   <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl" on:click|stopPropagation on:keydown|stopPropagation role="document">
     <!-- Header -->
     <div class="bg-gradient-to-r from-cyan-500 to-lime-500 p-6 text-white">
