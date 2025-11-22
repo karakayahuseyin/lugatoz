@@ -450,6 +450,9 @@ async def handle_start_game(sid, data):
         }
     }, room=room.room_code)
 
+    # Start timeout for fake answer submission
+    create_room_task(room.room_code, 'auto_force_fake', auto_force_fake_submissions(room.room_code))
+
 
 @sio.on('submit_fake_answer')
 async def handle_submit_fake_answer(sid, data):
@@ -496,6 +499,9 @@ async def handle_submit_fake_answer(sid, data):
             'options': current_round.all_options,
             'question': current_round.question_text
         }, room=room.room_code)
+
+        # Start voting timeout
+        create_room_task(room.room_code, 'auto_force_votes', auto_force_votes(room.room_code))
 
 
 @sio.on('submit_vote')
@@ -583,6 +589,78 @@ async def handle_add_reaction(sid, data):
 
 
 
+async def auto_force_fake_submissions(room_code):
+    """Force submit empty answers for players who haven't submitted after timeout"""
+    await asyncio.sleep(25)  # 20 seconds + 5 buffer
+
+    room = game_manager.get_room(room_code)
+    if not room or room.phase != GamePhase.SUBMITTING_FAKE:
+        return
+
+    current_round = room.rounds[room.current_round]
+
+    # Force submit for players who haven't submitted
+    for player_id in room.players:
+        if player_id not in current_round.fake_answers:
+            room.submit_fake_answer(player_id, "")  # Empty = timeout penalty
+
+    # Check if we should move to voting now
+    if room.phase == GamePhase.VOTING:
+        current_round = room.rounds[room.current_round]
+        await sio.emit('voting_phase', {
+            'options': current_round.all_options,
+            'question': current_round.question_text
+        }, room=room_code)
+
+        # Start voting timeout
+        create_room_task(room_code, 'auto_force_votes', auto_force_votes(room_code))
+
+
+async def auto_force_votes(room_code):
+    """Force submit empty votes for players who haven't voted after timeout"""
+    from .game_manager import normalize_answer
+
+    await asyncio.sleep(15)  # 10 seconds + 5 buffer
+
+    room = game_manager.get_room(room_code)
+    if not room or room.phase != GamePhase.VOTING:
+        return
+
+    current_round = room.rounds[room.current_round]
+
+    # Force vote for players who haven't voted
+    for player_id in room.players:
+        if player_id not in current_round.votes:
+            room.submit_vote(player_id, "")  # Empty = timeout penalty
+
+    # Show results if phase changed
+    if room.phase == GamePhase.SHOWING_RESULTS:
+        results = {
+            'round': room.current_round + 1,
+            'question': current_round.question_text,
+            'correct_answer': normalize_answer(current_round.correct_answer),
+            'acceptable_answers': current_round.acceptable_answers if current_round.acceptable_answers else None,
+            'player_votes': [],
+            'leaderboard': room.get_leaderboard()
+        }
+
+        for player_id, player in room.players.items():
+            vote_info = {
+                'name': player.name,
+                'voted_for': player.voted_answer if player.voted_answer else "",
+                'was_correct': player.voted_answer == normalize_answer(current_round.correct_answer) if player.voted_answer else False,
+                'fake_answer': current_round.fake_answers.get(player_id, ""),
+                'votes_received': sum(1 for v in current_round.votes.values()
+                                     if v == current_round.fake_answers.get(player_id))
+            }
+            results['player_votes'].append(vote_info)
+
+        await sio.emit('round_results', results, room=room_code)
+
+        # Auto proceed to next round
+        create_room_task(room_code, 'auto_next_round', auto_next_round(room_code))
+
+
 async def auto_next_round(room_code):
     """Automatically proceed to next round after 10 seconds"""
     await asyncio.sleep(10)  # Wait 10 seconds
@@ -621,6 +699,9 @@ async def auto_next_round(room_code):
                 'text': current_round.question_text
             }
         }, room=room_code)
+
+        # Start timeout for fake answer submission
+        create_room_task(room_code, 'auto_force_fake', auto_force_fake_submissions(room_code))
 
 
 async def auto_finish_final_test(room_code):
