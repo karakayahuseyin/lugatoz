@@ -413,8 +413,22 @@ class GameRoom:
             for player in sorted_players
         ]
 
-    def to_dict(self) -> Dict:
-        """Convert room info to dict"""
+    def to_dict(self, minimal: bool = False) -> Dict:
+        """Convert room info to dict
+
+        Args:
+            minimal: If True, return only essential data for low bandwidth
+        """
+        if minimal:
+            return {
+                'phase': self.phase.value,
+                'round': self.current_round,
+                'players': [
+                    {'name': p.name, 'score': p.score, 'host': p.is_host}
+                    for p in self.players.values()
+                ]
+            }
+
         return {
             'room_code': self.room_code,
             'phase': self.phase.value,

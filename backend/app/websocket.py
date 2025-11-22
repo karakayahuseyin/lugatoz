@@ -8,12 +8,15 @@ from .models import Question, GameStats, QuestionStats, User, UserStats
 from .auth import create_user, get_user_by_id, get_user_by_username, update_username, update_last_login, get_leaderboard, get_user_stats, update_user_stats_after_game
 from datetime import datetime
 
-# Create Socket.IO server
+# Create Socket.IO server with low-bandwidth optimizations
 sio = socketio.AsyncServer(
     async_mode='asgi',
     cors_allowed_origins='*',
     logger=False,
-    engineio_logger=False
+    engineio_logger=False,
+    ping_timeout=30,  # Wait 30 seconds before considering connection dead
+    ping_interval=15,  # Send ping every 15 seconds
+    max_http_buffer_size=1000000,  # 1MB max message size
 )
 
 # Track which room each socket is in

@@ -7,6 +7,23 @@ class SocketManager {
     this.lastRoomCode = null;
     this.lastPlayerName = null;
     this.isReconnecting = false;
+    this.connectionListeners = [];  // Bağlantı durumu değişikliği dinleyicileri
+    this.reconnectAttempt = 0;
+  }
+
+  // Bağlantı durumu değişikliği dinleyicisi ekle
+  onConnectionChange(callback) {
+    this.connectionListeners.push(callback);
+    // Mevcut durumu hemen bildir
+    callback(this.connected, this.isReconnecting);
+    return () => {
+      this.connectionListeners = this.connectionListeners.filter(cb => cb !== callback);
+    };
+  }
+
+  // Bağlantı durumu değişikliğini bildir
+  notifyConnectionChange() {
+    this.connectionListeners.forEach(cb => cb(this.connected, this.isReconnecting, this.reconnectAttempt));
   }
 
   connect() {
@@ -20,16 +37,21 @@ class SocketManager {
       path: '/socket.io',
       transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 10, // Daha fazla deneme
-      timeout: 20000
+      reconnectionDelay: 500,         // İlk deneme 500ms sonra
+      reconnectionDelayMax: 3000,     // Maksimum 3 saniye bekle
+      reconnectionAttempts: 20,       // 20 kez dene
+      timeout: 30000,                 // 30 saniye bağlantı timeout
+      forceNew: false,                // Mevcut bağlantıyı kullan
+      upgrade: true,                  // Polling'den WebSocket'e upgrade
+      rememberUpgrade: true,          // Upgrade'i hatırla
     });
 
     this.socket.on('connect', () => {
       this.connected = true;
+      this.reconnectAttempt = 0;
+      this.notifyConnectionChange();
 
-      // Eger daha once bir odadaysa, otomatik yeniden katil
+      // Eğer daha önce bir odadaysa, otomatik yeniden katıl
       if (this.lastRoomCode && this.lastPlayerName && this.isReconnecting) {
         setTimeout(() => {
           this.socket.emit('join_game', {
@@ -37,33 +59,39 @@ class SocketManager {
             room_code: this.lastRoomCode
           });
           this.isReconnecting = false;
-        }, 500);
+          this.notifyConnectionChange();
+        }, 300);
       }
     });
 
     this.socket.on('disconnect', (reason) => {
       this.connected = false;
 
-      // Eger sunucu kapatmadiysa (transport close veya ping timeout), yeniden baglanma isareti
-      if (reason === 'transport close' || reason === 'ping timeout') {
+      // Eğer sunucu kapatmadıysa, yeniden bağlanma işareti
+      if (reason === 'transport close' || reason === 'ping timeout' || reason === 'transport error') {
         this.isReconnecting = true;
       }
+      this.notifyConnectionChange();
     });
 
     this.socket.on('reconnect', () => {
-      // Reconnected successfully
+      this.reconnectAttempt = 0;
+      this.notifyConnectionChange();
     });
 
-    this.socket.on('reconnect_attempt', () => {
-      // Attempting to reconnect
+    this.socket.on('reconnect_attempt', (attemptNumber) => {
+      this.reconnectAttempt = attemptNumber;
+      this.isReconnecting = true;
+      this.notifyConnectionChange();
     });
 
     this.socket.on('reconnect_failed', () => {
       this.isReconnecting = false;
+      this.notifyConnectionChange();
     });
 
     this.socket.on('error', () => {
-      // Socket error occurred
+      this.notifyConnectionChange();
     });
 
     return this.socket;

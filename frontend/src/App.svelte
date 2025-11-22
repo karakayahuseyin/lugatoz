@@ -15,6 +15,7 @@
   import GameOver from './components/GameOver.svelte';
   import Admin from './components/Admin.svelte';
   import Notification from './components/Notification.svelte';
+  import ConnectionStatus from './components/ConnectionStatus.svelte';
 
   let socket;
   let currentRoute = 'game'; // 'game' or 'admin'
@@ -210,6 +211,9 @@
     showRoomSelection = false;
   }
 </script>
+
+<!-- Connection Status Banner -->
+<ConnectionStatus />
 
 <main>
   {#if $gameState.error}
