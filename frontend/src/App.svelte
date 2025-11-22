@@ -38,6 +38,21 @@
     if (currentRoute === 'game') {
       socket = socketManager.connect();
 
+      // Auto-login after socket connects (if user exists in localStorage)
+      socket.on('connect', () => {
+        const storedUser = localStorage.getItem('lugatoz_user');
+        if (storedUser) {
+          try {
+            const userData = JSON.parse(storedUser);
+            if (userData && userData.userId) {
+              socket.emit('login_user', { user_id: userData.userId });
+            }
+          } catch (e) {
+            // Invalid stored data
+          }
+        }
+      });
+
       // Socket event listeners
       socket.on('player_joined', (data) => {
         updateGameState({
@@ -174,6 +189,7 @@
     window.removeEventListener('hashchange', checkRoute);
     if (socket) {
       // Remove all event listeners before disconnect
+      socket.off('connect');
       socket.off('player_joined');
       socket.off('player_left');
       socket.off('game_started');

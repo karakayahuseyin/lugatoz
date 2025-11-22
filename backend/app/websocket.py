@@ -134,6 +134,7 @@ async def handle_login_user(sid, data):
 
         # Track user
         socket_users[sid] = user.user_id
+        print(f"[LOGIN] User {user.username} (id={user.user_id}) logged in, sid={sid}")
 
         await sio.emit('login_success', {
             'user_id': user.user_id,
@@ -354,6 +355,9 @@ async def handle_join_game(sid, data):
     # Link user_id to player if logged in
     if sid in socket_users:
         room.players[sid].user_id = socket_users[sid]
+        print(f"[JOIN] Player {player_name} linked to user_id={socket_users[sid]}")
+    else:
+        print(f"[JOIN] Player {player_name} is guest (no user_id)")
 
     # Track which room this socket is in
     socket_rooms[sid] = room_code
@@ -854,6 +858,7 @@ async def show_final_results(room):
 
             # Update user statistics if player is logged in
             player = room.players[player_id]
+            print(f"[STATS] Player {player.name}: user_id={player.user_id}")
             if player.user_id:
                 # Calculate deception stats
                 players_deceived = 0
