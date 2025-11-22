@@ -464,6 +464,10 @@ async def handle_submit_fake_answer(sid, data):
     fake_answer = data.get('answer', '').strip()
     room = get_player_room(sid)
 
+    if not room:
+        await sio.emit('error', {'message': 'Oda bulunamadı! Lütfen sayfayı yenileyin.'}, room=sid)
+        return
+
     # Allow empty answers (for timeout penalty)
     success = room.submit_fake_answer(sid, fake_answer)
 
@@ -513,6 +517,10 @@ async def handle_submit_vote(sid, data):
     """Submit vote"""
     chosen_answer = data.get('answer', '')
     room = get_player_room(sid)
+
+    if not room:
+        await sio.emit('error', {'message': 'Oda bulunamadı! Lütfen sayfayı yenileyin.'}, room=sid)
+        return
 
     success = room.submit_vote(sid, chosen_answer)
 
