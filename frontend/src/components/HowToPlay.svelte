@@ -2,8 +2,8 @@
   export let onClose = () => {};
 </script>
 
-<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" on:click={onClose} on:keydown={(e) => e.key === 'Escape' && onClose()} role="dialog" aria-modal="true" tabindex="-1">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" on:click|stopPropagation on:keydown|stopPropagation role="document">
     <!-- Header -->
     <div class="sticky top-0 bg-gradient-to-r from-cyan-500 to-lime-500 text-white p-6 rounded-t-2xl">
       <div class="flex justify-between items-center">

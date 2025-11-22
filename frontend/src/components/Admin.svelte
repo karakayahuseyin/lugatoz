@@ -203,16 +203,16 @@
 
         <div class="space-y-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
+            <label for="admin-password-input" class="block text-sm font-medium text-gray-700 mb-2">
               Şifre
             </label>
             <input
+              id="admin-password-input"
               type="password"
               bind:value={passwordInput}
               on:keypress={(e) => e.key === 'Enter' && checkPassword()}
               placeholder="Admin şifresini girin"
               class="input"
-              autofocus
             />
           </div>
 
@@ -468,10 +468,11 @@
 
           <div class="space-y-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
+              <label for="new-question-text" class="block text-sm font-medium text-gray-700 mb-2">
                 Soru Metni
               </label>
               <textarea
+                id="new-question-text"
                 bind:value={newQuestion.question_text}
                 placeholder="Sorunuzu buraya yazın..."
                 class="input min-h-[80px]"
@@ -479,10 +480,11 @@
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
+              <label for="new-correct-answer" class="block text-sm font-medium text-gray-700 mb-2">
                 Doğru Cevap (Görünür)
               </label>
               <input
+                id="new-correct-answer"
                 type="text"
                 bind:value={newQuestion.correct_answer}
                 placeholder="Doğru cevabı girin"
@@ -491,10 +493,11 @@
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
+              <label for="new-acceptable-answers" class="block text-sm font-medium text-gray-700 mb-2">
                 Kabul Edilebilir Cevaplar (Virgülle ayırın)
               </label>
               <input
+                id="new-acceptable-answers"
                 type="text"
                 bind:value={newQuestion.acceptable_answers}
                 placeholder="ankara,turkiyenin baskenti"
@@ -529,10 +532,11 @@
 
           <div class="space-y-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
+              <label for="edit-question-text" class="block text-sm font-medium text-gray-700 mb-2">
                 Soru Metni
               </label>
               <textarea
+                id="edit-question-text"
                 bind:value={editingQuestion.question_text}
                 placeholder="Sorunuzu buraya yazın..."
                 class="input min-h-[80px]"
@@ -540,10 +544,11 @@
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
+              <label for="edit-correct-answer" class="block text-sm font-medium text-gray-700 mb-2">
                 Doğru Cevap (Görünür)
               </label>
               <input
+                id="edit-correct-answer"
                 type="text"
                 bind:value={editingQuestion.correct_answer}
                 placeholder="Doğru cevabı girin"
@@ -552,10 +557,11 @@
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
+              <label for="edit-acceptable-answers" class="block text-sm font-medium text-gray-700 mb-2">
                 Kabul Edilebilir Cevaplar (Virgülle ayırın)
               </label>
               <input
+                id="edit-acceptable-answers"
                 type="text"
                 bind:value={editingQuestion.acceptable_answers}
                 placeholder="ankara,turkiyenin baskenti"

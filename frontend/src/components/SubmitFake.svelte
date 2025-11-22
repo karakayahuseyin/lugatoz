@@ -80,13 +80,14 @@
   {#if !$gameState.submittedAnswer}
     <div class="space-y-4">
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">
+        <label for="fake-answer-input" class="block text-sm font-medium text-gray-700 mb-2">
           <span class="text-red-500 font-bold">Yanlış</span> ama <span class="text-cyan-500 font-bold">inandırıcı</span> bir cevap girin!
         </label>
         <p class="text-xs text-gray-500 mb-3">
           Diğer oyuncuları aldatmaya çalışın! Yanlış cevabınızı seçen her oyuncu için +500 puan kazanırsınız.
         </p>
         <textarea
+          id="fake-answer-input"
           bind:value={fakeAnswer}
           placeholder="Yanlış cevabınızı buraya yazın..."
           class="input min-h-[100px] resize-none"

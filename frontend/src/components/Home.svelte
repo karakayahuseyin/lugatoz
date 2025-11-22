@@ -92,17 +92,17 @@
   {/if}
 
   <div class="mb-6">
-    <label class="block text-sm font-medium text-gray-700 mb-2">
+    <label for="player-name-input" class="block text-sm font-medium text-gray-700 mb-2">
       İsminiz
     </label>
     <input
+      id="player-name-input"
       type="text"
       bind:value={playerName}
       placeholder="İsminizi girin"
       class="input"
       maxlength="20"
       on:keypress={(e) => e.key === 'Enter' && submitName()}
-      autofocus
     />
   </div>
 

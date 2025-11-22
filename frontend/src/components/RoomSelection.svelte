@@ -197,8 +197,8 @@
 {/if}
 
 {#if showStats}
-  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" on:click={toggleStats} role="dialog" aria-modal="true">
-    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl" on:click|stopPropagation role="document">
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" on:click={toggleStats} on:keydown={(e) => e.key === 'Escape' && toggleStats()} role="dialog" aria-modal="true" tabindex="-1">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl" on:click|stopPropagation on:keydown|stopPropagation role="document">
       <!-- Header -->
       <div class="bg-gradient-to-r from-purple-500 to-pink-500 p-6 text-white">
         <div class="flex justify-between items-center">
