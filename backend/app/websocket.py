@@ -312,12 +312,18 @@ async def handle_join_game(sid, data):
         await sio.emit('error', {'message': 'Oyun zaten başladı!'}, room=sid)
         return
 
-    # Check if player is already in another room and remove them
+    # Check if player is already in another room
     if sid in socket_rooms:
         old_room_code = socket_rooms[sid]
         if old_room_code != room_code:
             old_room = game_manager.get_room(old_room_code)
             if old_room and sid in old_room.players:
+                # Don't allow leaving if game is in progress
+                if old_room.phase != GamePhase.WAITING and old_room.phase != GamePhase.GAME_OVER:
+                    await sio.emit('error', {'message': 'Oyun devam ederken oda değiştiremezsiniz!'}, room=sid)
+                    return
+
+                # Remove from old room
                 old_player_name = old_room.players[sid].name
                 old_room.remove_player(sid)
                 await sio.leave_room(sid, old_room_code)
