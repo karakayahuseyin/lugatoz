@@ -838,11 +838,12 @@ async def show_final_results(room):
             stats.completed_sessions += 1
             stats.total_players += len(room.players)
 
-        # Process each player's answers and stats
+        # Process each player's final test answers and stats
         for player_id in room.players:
+            player = room.players[player_id]
             answers = player_answers[player_id]
 
-            # Count correct/wrong answers
+            # Count correct/wrong answers from final test only
             correct_count = sum(1 for a in answers if a['is_correct'])
             wrong_count = len(answers) - correct_count
 
@@ -852,7 +853,7 @@ async def show_final_results(room):
                 stats.total_correct_answers += correct_count
                 stats.total_wrong_answers += wrong_count
 
-            # Update question-specific stats
+            # Update question-specific stats (final test only)
             for i, answer in enumerate(answers):
                 question_id = room.questions[i]['id']
                 question_stat = db.query(QuestionStats).filter(
@@ -867,10 +868,9 @@ async def show_final_results(room):
                         question_stat.times_wrong = (question_stat.times_wrong or 0) + 1
 
             # Update user statistics if player is logged in
-            player = room.players[player_id]
             print(f"[STATS] Player {player.name}: user_id={player.user_id}")
             if player.user_id:
-                # Calculate deception stats
+                # Calculate deception stats from normal rounds
                 players_deceived = 0
                 times_deceived = 0
 
@@ -886,7 +886,7 @@ async def show_final_results(room):
                     if player_vote and player_vote != normalize_answer(round_data.correct_answer):
                         times_deceived += 1
 
-                # Update user stats
+                # Update user stats (final test results only for correct/wrong)
                 update_user_stats_after_game(db, player.user_id, {
                     'won': player_id == winner_id,
                     'score': player.score,
