@@ -77,7 +77,7 @@
 
   async function loadQuestions() {
     try {
-      const response = await fetch('/api/questions');
+      const response = await fetch('/api/questions?include_inactive=true');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -171,8 +171,28 @@
     }
   }
 
+  async function toggleQuestion(id) {
+    try {
+      const response = await fetch(`/api/questions/${id}/toggle`, {
+        method: 'PATCH'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        questions = questions.map(q =>
+          q.id === id ? { ...q, is_active: data.is_active } : q
+        );
+      } else {
+        alert('Durum değiştirilemedi!');
+      }
+    } catch (error) {
+      console.error('Durum değiştirilemedi:', error);
+      alert('Durum değiştirilirken bir hata oluştu!');
+    }
+  }
+
   async function deleteQuestion(id) {
-    if (!confirm('Bu soruyu silmek istediğinizden emin misiniz?')) {
+    if (!confirm('Bu soruyu KALICI olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz ve soru istatistikleri de silinecektir.')) {
       return;
     }
 
@@ -594,7 +614,7 @@
       {:else}
         <div class="space-y-3">
           {#each questions as question}
-            <div class="bg-gray-50 p-4 rounded-lg border-2 border-gray-200 hover:border-cyan-300 transition-colors">
+            <div class="p-4 rounded-lg border-2 transition-colors {question.is_active ? 'bg-gray-50 border-gray-200 hover:border-cyan-300' : 'bg-red-50/50 border-red-200 hover:border-red-300 opacity-75'}">
               <div class="flex justify-between items-start mb-2">
                 <div class="flex-1">
                   <p class="font-semibold text-gray-800 mb-1">
@@ -626,9 +646,16 @@
               </div>
 
               <div class="flex gap-2 flex-wrap">
-                <span class="text-xs {question.is_active ? 'bg-cyan-100 text-cyan-700' : 'bg-red-100 text-red-700'} px-2 py-1 rounded-full">
+                <button
+                  on:click={() => toggleQuestion(question.id)}
+                  class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full cursor-pointer transition-colors duration-200 {question.is_active ? 'bg-cyan-100 text-cyan-700 hover:bg-cyan-200' : 'bg-red-100 text-red-700 hover:bg-red-200'}"
+                  title={question.is_active ? 'Pasif yapmak için tıklayın' : 'Aktif yapmak için tıklayın'}
+                >
+                  <span class="relative inline-block w-8 h-4 rounded-full transition-colors duration-200 {question.is_active ? 'bg-cyan-500' : 'bg-red-400'}">
+                    <span class="absolute top-0.5 {question.is_active ? 'left-4' : 'left-0.5'} inline-block w-3 h-3 rounded-full bg-white transition-all duration-200 shadow"></span>
+                  </span>
                   {question.is_active ? 'Aktif' : 'Pasif'}
-                </span>
+                </button>
                 {#if question.stats}
                   <span class="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
                     {question.stats.games_used} oyunda kullanıldı

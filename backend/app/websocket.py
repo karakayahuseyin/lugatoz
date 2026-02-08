@@ -1080,7 +1080,7 @@ async def handle_restart_game(sid, data):
     # Get questions from database
     db = SessionLocal()
     try:
-        questions = db.query(Question).all()
+        questions = db.query(Question).filter(Question.is_active == True).all()
         questions_list = [
             {
                 'id': q.id,

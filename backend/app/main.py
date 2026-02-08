@@ -88,10 +88,14 @@ async def get_questions(
     skip: int = 0,
     limit: int = None,
     category: str = None,
+    include_inactive: bool = False,
     db: Session = Depends(get_db)
 ):
     """Tüm soruları listele (istatistiklerle birlikte)"""
-    query = db.query(Question).filter(Question.is_active == True)
+    query = db.query(Question)
+
+    if not include_inactive:
+        query = query.filter(Question.is_active == True)
 
     if category:
         query = query.filter(Question.category == category)
@@ -177,17 +181,41 @@ async def update_question(
     return db_question
 
 
-@app.delete("/api/questions/{question_id}")
-async def delete_question(question_id: int, db: Session = Depends(get_db)):
-    """Soru sil (soft delete)"""
+@app.patch("/api/questions/{question_id}/toggle")
+async def toggle_question_active(question_id: int, db: Session = Depends(get_db)):
+    """Sorunun aktif/pasif durumunu değiştir"""
     db_question = db.query(Question).filter(Question.id == question_id).first()
 
     if not db_question:
         raise HTTPException(status_code=404, detail="Soru bulunamadı")
 
-    db_question.is_active = False
+    db_question.is_active = not db_question.is_active
     db.commit()
-    return {"message": "Soru silindi", "id": question_id}
+    db.refresh(db_question)
+
+    return {
+        "id": db_question.id,
+        "is_active": db_question.is_active,
+        "message": f"Soru {'aktif' if db_question.is_active else 'pasif'} yapıldı"
+    }
+
+
+@app.delete("/api/questions/{question_id}")
+async def delete_question(question_id: int, db: Session = Depends(get_db)):
+    """Soru sil (hard delete - veritabanından kalıcı olarak kaldırır)"""
+    db_question = db.query(Question).filter(Question.id == question_id).first()
+
+    if not db_question:
+        raise HTTPException(status_code=404, detail="Soru bulunamadı")
+
+    # İlişkili istatistikleri sil (FK kısıtı)
+    db.query(QuestionStats).filter(
+        QuestionStats.question_id == question_id
+    ).delete()
+
+    db.delete(db_question)
+    db.commit()
+    return {"message": "Soru kalıcı olarak silindi", "id": question_id}
 
 
 @app.get("/api/categories")
