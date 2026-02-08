@@ -59,6 +59,27 @@
     }
   }
 
+  async function resetRoom(roomCode) {
+    if (!confirm('Bu odayı temizlemek istediğinizden emin misiniz? Tüm oyuncular çıkarılacak.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/rooms/${roomCode}/reset`, {
+        method: 'POST'
+      });
+
+      if (response.ok) {
+        await loadRooms();
+      } else {
+        alert('Oda sıfırlanamadı!');
+      }
+    } catch (error) {
+      console.error('Oda sıfırlanamadı:', error);
+      alert('Oda sıfırlanırken bir hata oluştu!');
+    }
+  }
+
   function getPhaseText(phase) {
     const phases = {
       'waiting': 'Lobide',
@@ -373,11 +394,19 @@
                       </span>
                     {/if}
                   </div>
-                  <div class="text-right">
+                  <div class="flex items-center gap-2">
                     <span class="text-sm font-bold {
                       room.players.length === 0 ? 'text-gray-400' : 'text-orange-600'
                     }">{room.players.length}/{room.max_players}</span>
-                    <span class="text-xs text-gray-500 ml-1">oyuncu</span>
+                    <span class="text-xs text-gray-500">oyuncu</span>
+                    {#if room.players.length > 0}
+                      <button
+                        on:click={() => resetRoom(room.room_code)}
+                        class="btn btn-danger text-xs py-1 px-2"
+                      >
+                        Temizle
+                      </button>
+                    {/if}
                   </div>
                 </div>
 

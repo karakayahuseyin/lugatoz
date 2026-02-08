@@ -232,6 +232,36 @@ async def get_rooms():
     return game_manager.get_all_rooms()
 
 
+@app.post("/api/rooms/{room_code}/reset")
+async def reset_room(room_code: str):
+    """Admin: Odayı zorla sıfırla (tüm oyuncuları çıkar ve odayı temizle)"""
+    from .game_manager import game_manager
+    from .websocket import sio, socket_rooms, cancel_all_room_tasks
+
+    room = game_manager.get_room(room_code)
+    if not room:
+        raise HTTPException(status_code=404, detail="Oda bulunamadı")
+
+    # Asılı task'ları iptal et
+    cancel_all_room_tasks(room_code)
+
+    # Socket tracking'den oyuncuları temizle
+    players_to_remove = [sid for sid, code in socket_rooms.items() if code == room_code]
+    for player_sid in players_to_remove:
+        await sio.leave_room(player_sid, room_code)
+        del socket_rooms[player_sid]
+
+    # Odadaki oyunculara bildir
+    await sio.emit('room_reset', {
+        'message': 'Oda admin tarafından sıfırlandı. Ana sayfaya yönlendiriliyorsunuz...'
+    }, room=room_code)
+
+    # Odayı sıfırla
+    game_manager.reset_room(room_code)
+
+    return {"message": "Oda sıfırlandı", "room_code": room_code}
+
+
 @app.get("/api/users")
 async def get_users(db: Session = Depends(get_db)):
     """Tüm kullanıcıları listele (Admin için)"""
