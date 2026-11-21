@@ -11,8 +11,7 @@
   let reactions = {};
 
   function handleTimeout() {
-    // Timer finished - backend will automatically proceed to next round
-    // No action needed from frontend
+    // Timer finished - backend automatically proceeds to next round
   }
 
   function toggleEmojiPicker(playerName) {
@@ -24,33 +23,40 @@
 
   function handleEmojiSelect(event) {
     const { answer, emoji } = event.detail;
-    // answer here is the player name
     socketManager.emit('add_reaction', { answer, emoji });
     showEmojiPicker[answer] = false;
   }
 
   onMount(() => {
-    // Listen for reaction updates
     const socket = socketManager.getSocket();
-    socket.on('reaction_added', (data) => {
+    if (!socket) return;
+
+    const onReaction = (data) => {
       reactions = data.all_reactions;
-    });
+    };
+    socket.on('reaction_added', onReaction);
 
     return () => {
-      socket.off('reaction_added');
+      socket.off('reaction_added', onReaction);
     };
   });
-
-  // Timer is only visual - backend handles auto-progression after 10 seconds
 </script>
 
-<div class="card max-w-4xl w-full">
+<div class="card max-w-4xl w-full my-4">
   <div class="mb-6">
+    {#if $gameState.topic}
+      <div class="text-center mb-3">
+        <span class="inline-block text-xs font-bold bg-cyan-100 text-cyan-800 px-3 py-1 rounded-full">
+          {$gameState.topic.grade === 'dunyanin_enleri' ? '🌍' : '📚'} {$gameState.topic.label}
+        </span>
+      </div>
+    {/if}
+
     <div class="flex justify-between items-start mb-4">
       <div class="flex-1"></div>
       <div class="flex-1 text-center">
         <h1 class="text-4xl font-bold text-primary mb-2">Tur Sonuçları</h1>
-        <p class="text-gray-600">Soru {$gameState.currentRound + 1} tamamlandı!</p>
+        <p class="text-gray-600">Soru {$gameState.currentRound + 1} / {$gameState.maxRounds} tamamlandı!</p>
       </div>
       <div class="flex-1 flex justify-end">
         <Timer bind:this={timer} duration={10} onTimeout={handleTimeout} />
@@ -63,12 +69,6 @@
     <p class="text-3xl font-bold text-cyan-800 text-center">
       {$gameState.results?.correct_answer}
     </p>
-    {#if $gameState.results?.acceptable_answers}
-      <p class="text-center text-gray-600 mt-3 text-sm font-semibold">Kabul Edilebilir Cevaplar:</p>
-      <p class="text-lg text-cyan-700 text-center">
-        {$gameState.results.acceptable_answers}
-      </p>
-    {/if}
   </div>
 
   <div class="mb-6">
@@ -95,7 +95,6 @@
             {/if}
           </div>
 
-          <!-- Show reactions for this player -->
           {#if reactions[vote.player_name?.toLowerCase()]}
             <div class="flex gap-2 flex-wrap mb-2">
               {#each Object.entries(reactions[vote.player_name.toLowerCase()]) as [_senderId, reaction]}
@@ -106,7 +105,6 @@
             </div>
           {/if}
 
-          <!-- Emoji Picker -->
           {#if showEmojiPicker[vote.player_name]}
             <div class="absolute top-12 left-0 z-50">
               <EmojiPicker
@@ -121,7 +119,7 @@
             <div class="flex items-center gap-2">
               <span class="text-gray-600">Seçtiği:</span>
               <span class="font-semibold {vote.was_correct ? 'text-cyan-700' : 'text-red-600'}">
-                {vote.voted_for}
+                {vote.voted_for || '(Oy vermedi)'}
               </span>
               {#if vote.was_correct}
                 <span class="text-cyan-600">✓</span>
@@ -173,7 +171,9 @@
 
   <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 text-center">
     <p class="text-blue-800 font-semibold">
-      {$gameState.currentRound + 1 >= $gameState.maxRounds ? 'Final testine geçiliyor...' : 'Sonraki soruya geçiliyor...'}
+      {$gameState.currentRound + 1 >= $gameState.maxRounds
+        ? 'Kavram eşleştirme etkinliğine geçiliyor...'
+        : 'Sonraki soruya geçiliyor...'}
     </p>
     <p class="text-blue-600 text-sm mt-2">
       10 saniye içinde otomatik olarak devam edilecek

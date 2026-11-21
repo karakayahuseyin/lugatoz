@@ -41,6 +41,10 @@ body {
   @apply bg-danger hover:bg-danger/90 text-white;
 }
 
+.btn-outline {
+  @apply border-2 border-gray-300 bg-white hover:bg-gray-100 text-gray-700;
+}
+
 .card {
   @apply bg-white rounded-2xl shadow-2xl p-8;
 }

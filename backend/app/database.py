@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from .models import Base, Question
 import os
@@ -26,94 +26,150 @@ def get_db():
         db.close()
 
 
+def migrate_db():
+    """Mevcut SQLite veritabanına yeni Tarihöz sütunlarını güvenle ekle"""
+    with engine.begin() as conn:
+        result = conn.execute(text("PRAGMA table_info(questions)"))
+        existing_columns = {row[1] for row in result.fetchall()}
+
+        if "grade" not in existing_columns:
+            conn.execute(text("ALTER TABLE questions ADD COLUMN grade VARCHAR(50)"))
+            print("Migration: questions.grade eklendi")
+
+        if "theme" not in existing_columns:
+            conn.execute(text("ALTER TABLE questions ADD COLUMN theme VARCHAR(100)"))
+            print("Migration: questions.theme eklendi")
+
+        if "unacceptable_answers" not in existing_columns:
+            conn.execute(text("ALTER TABLE questions ADD COLUMN unacceptable_answers TEXT"))
+            # Mevcut acceptable_answers değerlerini geriye dönük koru
+            if "acceptable_answers" in existing_columns:
+                conn.execute(text(
+                    "UPDATE questions SET unacceptable_answers = acceptable_answers "
+                    "WHERE acceptable_answers IS NOT NULL AND unacceptable_answers IS NULL"
+                ))
+            print("Migration: questions.unacceptable_answers eklendi")
+
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_questions_grade_theme ON questions (grade, theme)"
+        ))
+
+
 def init_db():
-    """Veritabanını başlat ve tabloları oluştur"""
-    # Create data directory if it doesn't exist
+    """Veritabanını başlat, tabloları oluştur ve migrasyonu çalıştır"""
     os.makedirs("./data", exist_ok=True)
 
     Base.metadata.create_all(bind=engine)
-    print("Veritabani tablolari olusturuldu")
+    migrate_db()
+    print("Veritabani tablolari hazir")
 
-    # Örnek sorular ekle (eğer veritabanı boşsa)
+    # Veritabanı tamamen boşsa başlangıç için örnek Tarihöz soruları ekle
     db = SessionLocal()
     try:
         if db.query(Question).count() == 0:
             sample_questions = [
+                # 5. Sınıf - 1. Birlikte Yaşamak
                 Question(
-                    question_text="Türkiye'nin başkenti neresidir?",
-                    correct_answer="Ankara",
-                    category="Coğrafya",
-                    difficulty="easy"
+                    question_text="Bir kişinin kendini başkasının yerine koyarak onun duygu ve düşüncelerini anlamaya çalışmasına ne denir?",
+                    correct_answer="Empati",
+                    unacceptable_answers="duygudaşlık, empati kurmak",
+                    acceptable_answers="duygudaşlık, empati kurmak",
+                    grade="5",
+                    theme="birlikte_yasamak",
                 ),
                 Question(
-                    question_text="Dünyanın en büyük okyanusu hangisidir?",
+                    question_text="İnsanların bir arada yaşarken ortak amaçlarla oluşturdukları, kuralları olan en az iki kişilik topluluklara ne ad verilir?",
+                    correct_answer="Grup",
+                    unacceptable_answers="topluluk",
+                    acceptable_answers="topluluk",
+                    grade="5",
+                    theme="birlikte_yasamak",
+                ),
+                Question(
+                    question_text="Bireyin içinde yer aldığı gruplarda üstlendiği görev ve sorumluluklara ne denir?",
+                    correct_answer="Rol",
+                    unacceptable_answers="görev, sosyal rol",
+                    acceptable_answers="görev, sosyal rol",
+                    grade="5",
+                    theme="birlikte_yasamak",
+                ),
+                Question(
+                    question_text="Toplumda yardımlaşma ve dayanışma amacıyla gönüllü olarak kurulan kuruluşlara ne ad verilir?",
+                    correct_answer="Sivil Toplum Kuruluşu",
+                    unacceptable_answers="STK, vakıf, dernek",
+                    acceptable_answers="STK, vakıf, dernek",
+                    grade="5",
+                    theme="birlikte_yasamak",
+                ),
+                # 8. Sınıf - 1. Bir Kahraman Doğuyor
+                Question(
+                    question_text="Mustafa Kemal'in 1881 yılında dünyaya geldiği Osmanlı şehri hangisidir?",
+                    correct_answer="Selanik",
+                    unacceptable_answers="selanik şehri",
+                    acceptable_answers="selanik şehri",
+                    grade="8",
+                    theme="bir_kahraman_doguyor",
+                ),
+                Question(
+                    question_text="Mustafa Kemal'e 'Kemal' adının verildiği okul hangisidir?",
+                    correct_answer="Selanik Askerî Rüştiyesi",
+                    unacceptable_answers="askeri rüştiye, selanik askeri rüştiyesi",
+                    acceptable_answers="askeri rüştiye, selanik askeri rüştiyesi",
+                    grade="8",
+                    theme="bir_kahraman_doguyor",
+                ),
+                Question(
+                    question_text="Mustafa Kemal'in ilk görev yeri olan ve 5. Ordu'nun bulunduğu şehir hangisidir?",
+                    correct_answer="Şam",
+                    unacceptable_answers="suriye, şam şehri",
+                    acceptable_answers="suriye, şam şehri",
+                    grade="8",
+                    theme="bir_kahraman_doguyor",
+                ),
+                Question(
+                    question_text="1789 yılında gerçekleşerek milliyetçilik akımının dünyaya yayılmasına yol açan büyük tarihî olay hangisidir?",
+                    correct_answer="Fransız İhtilali",
+                    unacceptable_answers="fransız devrimi",
+                    acceptable_answers="fransız devrimi",
+                    grade="8",
+                    theme="bir_kahraman_doguyor",
+                ),
+                # Dünyanın Enleri
+                Question(
+                    question_text="Dünyanın yüz ölçümü bakımından en büyük okyanusu hangisidir?",
                     correct_answer="Pasifik Okyanusu",
-                    category="Coğrafya",
-                    difficulty="easy"
+                    unacceptable_answers="Büyük Okyanus, pasifik",
+                    acceptable_answers="Büyük Okyanus, pasifik",
+                    grade="dunyanin_enleri",
+                    theme=None,
                 ),
                 Question(
-                    question_text="Işık hızı yaklaşık kaç km/s'dir?",
-                    correct_answer="300000",
-                    category="Fizik",
-                    difficulty="medium"
+                    question_text="Dünyanın deniz seviyesinden en yüksek dağı hangisidir?",
+                    correct_answer="Everest Dağı",
+                    unacceptable_answers="Everest, Everest Tepesi",
+                    acceptable_answers="Everest, Everest Tepesi",
+                    grade="dunyanin_enleri",
+                    theme=None,
                 ),
                 Question(
-                    question_text="İlk bilgisayar programcısı olarak kabul edilen kişi kimdir?",
-                    correct_answer="Ada Lovelace",
-                    category="Tarih",
-                    difficulty="medium"
+                    question_text="Dünyanın yüz ölçümü en büyük kıtası hangisidir?",
+                    correct_answer="Asya",
+                    unacceptable_answers="Asya Kıtası",
+                    acceptable_answers="Asya Kıtası",
+                    grade="dunyanin_enleri",
+                    theme=None,
                 ),
                 Question(
-                    question_text="DNA'nın açılımı nedir?",
-                    correct_answer="Deoksiribonükleik Asit",
-                    category="Biyoloji",
-                    difficulty="medium"
-                ),
-                Question(
-                    question_text="İnsanlık tarihinde ilk yazı hangi medeniyette bulunmuştur?",
-                    correct_answer="Sümer",
-                    category="Tarih",
-                    difficulty="hard"
-                ),
-                Question(
-                    question_text="Osmanlı İmparatorluğu kaç yıl sürmüştür?",
-                    correct_answer="623",
-                    category="Tarih",
-                    difficulty="hard"
-                ),
-                Question(
-                    question_text="Periyodik tabloda altın elementinin sembolü nedir?",
-                    correct_answer="Au",
-                    category="Kimya",
-                    difficulty="medium"
-                ),
-                Question(
-                    question_text="Python programlama dili hangi yıl yaratılmıştır?",
-                    correct_answer="1991",
-                    category="Teknoloji",
-                    difficulty="medium"
-                ),
-                Question(
-                    question_text="Dünyada en çok konuşulan dil hangisidir?",
-                    correct_answer="Mandarin Çincesi",
-                    category="Dil",
-                    difficulty="medium"
-                ),
-                Question(
-                    question_text="Fotosentez olayı bitkilerin hangi organelinde gerçekleşir?",
-                    correct_answer="Kloroplast",
-                    category="Biyoloji",
-                    difficulty="hard"
-                ),
-                Question(
-                    question_text="Shakespeare'in kaç tane oyunu vardır?",
-                    correct_answer="37",
-                    category="Edebiyat",
-                    difficulty="hard"
+                    question_text="Dünyanın en büyük sıcak çölü hangisidir?",
+                    correct_answer="Sahra Çölü",
+                    unacceptable_answers="Sahra, Büyük Sahra",
+                    acceptable_answers="Sahra, Büyük Sahra",
+                    grade="dunyanin_enleri",
+                    theme=None,
                 ),
             ]
             db.add_all(sample_questions)
             db.commit()
-            print(f"{len(sample_questions)} ornek soru eklendi")
+            print(f"{len(sample_questions)} ornek Tarihoz sorusu eklendi")
     finally:
         db.close()

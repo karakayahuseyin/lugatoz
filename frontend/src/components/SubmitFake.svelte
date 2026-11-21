@@ -1,4 +1,5 @@
 <script>
+  import { onMount, onDestroy } from 'svelte';
   import { gameState, updateGameState } from '../stores/gameStore';
   import { socketManager } from '../utils/socket';
   import { notifications } from '../stores/notificationStore';
@@ -6,7 +7,6 @@
 
   let fakeAnswer = '';
   let timer;
-  let timeoutReached = false;
 
   function submitFakeAnswer() {
     if (!fakeAnswer.trim()) {
@@ -17,17 +17,13 @@
     socketManager.emit('submit_fake_answer', {
       answer: fakeAnswer.trim()
     });
-    // Don't set submittedAnswer here - wait for backend confirmation
   }
 
   function handleTimeout() {
-    timeoutReached = true;
-    // Auto-submit if user has entered something
     if (fakeAnswer.trim()) {
       submitFakeAnswer();
     } else {
       notifications.error('Süre doldu! Cevap girmediniz, -100 puan cezası aldınız.');
-      // Submit empty to trigger penalty
       socketManager.emit('submit_fake_answer', {
         answer: ''
       });
@@ -35,28 +31,47 @@
     }
   }
 
-  // Listen for success from backend
-  socketManager.on('fake_answer_submitted', (data) => {
+  function handleFakeSubmitted(data) {
     if (data.success) {
       if (timer) timer.stop();
       updateGameState({ submittedAnswer: true });
     }
-  });
+  }
 
-  // Listen for error from backend
-  socketManager.on('answer_rejected', (data) => {
+  function handleAnswerRejected(data) {
     if (data.reason === 'correct_answer') {
-      notifications.info('Bu şıklara zaten eklendi! Farklı bir cevap deneyin.');
+      notifications.info(data.message || 'Bu yanıt şıklara zaten eklendi! Farklı bir yanıt deneyin.');
+      fakeAnswer = '';
+    } else if (data.reason === 'unacceptable_answer') {
+      notifications.warning(data.message || 'Bu yanıt kabul edilmiyor! Farklı bir yanıt deneyin.');
       fakeAnswer = '';
     } else if (data.reason === 'duplicate_answer') {
-      notifications.info('Bu şıklara zaten eklendi! Farklı bir cevap deneyin.');
+      notifications.info(data.message || 'Bu yanıt zaten başka bir oyuncu tarafından girildi! Farklı bir yanıt deneyin.');
       fakeAnswer = '';
     }
+  }
+
+  onMount(() => {
+    socketManager.on('fake_answer_submitted', handleFakeSubmitted);
+    socketManager.on('answer_rejected', handleAnswerRejected);
+  });
+
+  onDestroy(() => {
+    socketManager.off('fake_answer_submitted', handleFakeSubmitted);
+    socketManager.off('answer_rejected', handleAnswerRejected);
   });
 </script>
 
 <div class="card max-w-3xl w-full">
   <div class="mb-6">
+    {#if $gameState.topic}
+      <div class="text-center mb-3">
+        <span class="inline-block text-xs font-bold bg-cyan-100 text-cyan-800 px-3 py-1 rounded-full">
+          {$gameState.topic.grade === 'dunyanin_enleri' ? '🌍' : '📚'} {$gameState.topic.label}
+        </span>
+      </div>
+    {/if}
+
     <div class="flex justify-between items-center mb-4">
       <span class="bg-primary text-white px-4 py-2 rounded-full font-semibold">
         Soru {$gameState.currentRound + 1} / {$gameState.maxRounds}
@@ -122,8 +137,7 @@
     <h4 class="font-semibold text-gray-700 mb-3">İpucu:</h4>
     <p class="text-sm text-gray-600">
       En iyi yanlış cevaplar gerçek gibi görünür! Çok açık yanlış cevaplar kimseyi aldatmaz.
-      Örnek: "Türkiye'nin başkenti neresidir?" sorusu için "Mars" yerine "İzmir" veya "İstanbul" gibi
-      inandırıcı ama yanlış bir şehir yazabilirsiniz.
+      Doğru cevap ve kabul edilmeyen yanıtlar sisteme girilemez.
     </p>
   </div>
 </div>

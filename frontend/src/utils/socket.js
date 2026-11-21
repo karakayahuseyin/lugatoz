@@ -6,14 +6,14 @@ class SocketManager {
     this.connected = false;
     this.lastRoomCode = null;
     this.lastPlayerName = null;
+    this.lastGrade = null;
+    this.lastTheme = null;
     this.isReconnecting = false;
   }
 
   connect() {
     if (this.socket) return this.socket;
 
-    // Socket.IO bağlantısı
-    // Production'da window.location.origin kullanarak doğru URL'yi al
     const socketUrl = window.location.origin;
 
     this.socket = io(socketUrl, {
@@ -22,19 +22,20 @@ class SocketManager {
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: 10, // Daha fazla deneme
+      reconnectionAttempts: 10,
       timeout: 20000
     });
 
     this.socket.on('connect', () => {
       this.connected = true;
 
-      // Eger daha once bir odadaysa, otomatik yeniden katil
       if (this.lastRoomCode && this.lastPlayerName && this.isReconnecting) {
         setTimeout(() => {
           this.socket.emit('join_game', {
             player_name: this.lastPlayerName,
-            room_code: this.lastRoomCode
+            room_code: this.lastRoomCode,
+            grade: this.lastGrade,
+            theme: this.lastTheme
           });
           this.isReconnecting = false;
         }, 500);
@@ -44,41 +45,30 @@ class SocketManager {
     this.socket.on('disconnect', (reason) => {
       this.connected = false;
 
-      // Eger sunucu kapatmadiysa (transport close veya ping timeout), yeniden baglanma isareti
       if (reason === 'transport close' || reason === 'ping timeout') {
         this.isReconnecting = true;
       }
-    });
-
-    this.socket.on('reconnect', () => {
-      // Reconnected successfully
-    });
-
-    this.socket.on('reconnect_attempt', () => {
-      // Attempting to reconnect
     });
 
     this.socket.on('reconnect_failed', () => {
       this.isReconnecting = false;
     });
 
-    this.socket.on('error', () => {
-      // Socket error occurred
-    });
-
     return this.socket;
   }
 
-  // Oda bilgilerini sakla (yeniden bağlanma için)
-  setRoomInfo(playerName, roomCode) {
+  setRoomInfo(playerName, roomCode, grade = null, theme = null) {
     this.lastPlayerName = playerName;
     this.lastRoomCode = roomCode;
+    this.lastGrade = grade;
+    this.lastTheme = theme;
   }
 
-  // Oda bilgilerini temizle
   clearRoomInfo() {
     this.lastPlayerName = null;
     this.lastRoomCode = null;
+    this.lastGrade = null;
+    this.lastTheme = null;
     this.isReconnecting = false;
   }
 

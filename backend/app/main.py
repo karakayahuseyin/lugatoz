@@ -1,20 +1,21 @@
 # -*- coding: utf-8 -*-
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
-from typing import List
+from sqlalchemy import func
+from typing import Optional
 from pydantic import BaseModel
 
 from .database import get_db, init_db
 from .models import Question, GameStats, QuestionStats, User, UserStats
+from .curriculum import get_curriculum, validate_grade_and_theme, grade_has_themes
 from .websocket import socket_app
 
 # FastAPI uygulaması
 app = FastAPI(
-    title="LügaTöz API",
-    description="Eğitici multiplayer aldatma oyunu",
-    version="1.0.0"
+    title="Tarihöz API",
+    description="Tarih ve Sosyal Bilgiler eğitici multiplayer bilgi oyunu",
+    version="2.0.0"
 )
 
 # CORS ayarları
@@ -31,8 +32,12 @@ app.add_middleware(
 class QuestionCreate(BaseModel):
     question_text: str
     correct_answer: str
-    acceptable_answers: str = None
-    category: str = None
+    unacceptable_answers: Optional[str] = None
+    grade: str
+    theme: Optional[str] = None
+    # Geriye dönük uyumluluk için opsiyonel alanlar
+    acceptable_answers: Optional[str] = None
+    category: Optional[str] = None
     difficulty: str = "medium"
 
 
@@ -40,8 +45,11 @@ class QuestionResponse(BaseModel):
     id: int
     question_text: str
     correct_answer: str
-    acceptable_answers: str | None
-    category: str | None
+    unacceptable_answers: Optional[str] = None
+    acceptable_answers: Optional[str] = None
+    grade: Optional[str] = None
+    theme: Optional[str] = None
+    category: Optional[str] = None
     difficulty: str
     is_active: bool
 
@@ -67,10 +75,11 @@ class GameStatsResponse(BaseModel):
 async def root():
     """Ana endpoint"""
     return {
-        "message": "LügaTöz API'ye hoş geldiniz!",
-        "version": "1.0.0",
+        "message": "Tarihöz API'ye hoş geldiniz!",
+        "version": "2.0.0",
         "endpoints": {
             "health": "/health",
+            "curriculum": "/api/curriculum",
             "questions": "/api/questions",
             "socket": "/socket.io/"
         }
@@ -80,47 +89,116 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Sağlık kontrolü"""
-    return {"status": "healthy", "service": "lugatoz"}
+    return {"status": "healthy", "service": "tarihoz"}
+
+
+@app.get("/api/curriculum")
+async def get_curriculum_with_counts(db: Session = Depends(get_db)):
+    """Sınıf, tema ve Dünyanın Enleri yapısını soru sayılarıyla birlikte döndür"""
+    sections = get_curriculum()
+
+    # Toplam ve aktif soru sayılarını tek sorguda topla
+    counts_rows = (
+        db.query(
+            Question.grade,
+            Question.theme,
+            Question.is_active,
+            func.count(Question.id)
+        )
+        .group_by(Question.grade, Question.theme, Question.is_active)
+        .all()
+    )
+
+    total_by_grade = {}
+    active_by_grade = {}
+    total_by_theme = {}
+    active_by_theme = {}
+    uncategorized_total = 0
+
+    for grade, theme, is_active, count in counts_rows:
+        if not grade:
+            uncategorized_total += count
+            continue
+        total_by_grade[grade] = total_by_grade.get(grade, 0) + count
+        if is_active:
+            active_by_grade[grade] = active_by_grade.get(grade, 0) + count
+
+        key = (grade, theme)
+        total_by_theme[key] = total_by_theme.get(key, 0) + count
+        if is_active:
+            active_by_theme[key] = active_by_theme.get(key, 0) + count
+
+    for section in sections:
+        g_id = section["id"]
+        section["total_questions"] = total_by_grade.get(g_id, 0)
+        section["active_questions"] = active_by_grade.get(g_id, 0)
+
+        for theme_obj in section["themes"]:
+            key = (g_id, theme_obj["id"])
+            theme_obj["total_questions"] = total_by_theme.get(key, 0)
+            theme_obj["active_questions"] = active_by_theme.get(key, 0)
+
+    return {
+        "sections": sections,
+        "uncategorized_questions": uncategorized_total
+    }
 
 
 @app.get("/api/questions")
 async def get_questions(
     skip: int = 0,
-    limit: int = None,
-    category: str = None,
+    limit: Optional[int] = None,
+    grade: Optional[str] = None,
+    theme: Optional[str] = None,
+    category: Optional[str] = None,
+    uncategorized: bool = False,
     include_inactive: bool = False,
     db: Session = Depends(get_db)
 ):
-    """Tüm soruları listele (istatistiklerle birlikte)"""
+    """Soruları sınıf/tema filtresi ve istatistiklerle birlikte listele"""
     query = db.query(Question)
 
     if not include_inactive:
         query = query.filter(Question.is_active == True)
 
+    if uncategorized:
+        query = query.filter(Question.grade.is_(None))
+    elif grade:
+        query = query.filter(Question.grade == grade)
+        if grade_has_themes(grade):
+            if theme:
+                query = query.filter(Question.theme == theme)
+        else:
+            query = query.filter((Question.theme.is_(None)) | (Question.theme == ""))
+    elif theme:
+        query = query.filter(Question.theme == theme)
+
     if category:
         query = query.filter(Question.category == category)
 
-    query = query.offset(skip)
+    query = query.order_by(Question.id.desc()).offset(skip)
     if limit:
         query = query.limit(limit)
 
     questions = query.all()
 
-    # Add statistics to each question
     result = []
     for q in questions:
+        unacceptable = q.unacceptable_answers if q.unacceptable_answers is not None else q.acceptable_answers
         q_dict = {
             'id': q.id,
             'question_text': q.question_text,
             'correct_answer': q.correct_answer,
-            'acceptable_answers': q.acceptable_answers,
+            'unacceptable_answers': unacceptable,
+            'acceptable_answers': unacceptable,
+            'grade': q.grade,
+            'theme': q.theme,
             'category': q.category,
             'difficulty': q.difficulty,
             'is_active': q.is_active,
             'stats': None
         }
 
-        # Get stats for this question
         stats = db.query(QuestionStats).filter(
             QuestionStats.question_id == q.id
         ).first()
@@ -154,7 +232,35 @@ async def get_question(question_id: int, db: Session = Depends(get_db)):
 @app.post("/api/questions", response_model=QuestionResponse, status_code=201)
 async def create_question(question: QuestionCreate, db: Session = Depends(get_db)):
     """Yeni soru oluştur"""
-    db_question = Question(**question.model_dump())
+    q_text = question.question_text.strip()
+    c_answer = question.correct_answer.strip()
+
+    if not q_text or not c_answer:
+        raise HTTPException(status_code=400, detail="Soru ve doğru cevap alanları zorunludur!")
+
+    try:
+        valid_grade, valid_theme = validate_grade_and_theme(question.grade, question.theme)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    raw_unacceptable = (
+        question.unacceptable_answers
+        if question.unacceptable_answers is not None
+        else question.acceptable_answers
+    )
+    cleaned_unacceptable = raw_unacceptable.strip() if raw_unacceptable and raw_unacceptable.strip() else None
+
+    db_question = Question(
+        question_text=q_text,
+        correct_answer=c_answer,
+        unacceptable_answers=cleaned_unacceptable,
+        acceptable_answers=cleaned_unacceptable,
+        grade=valid_grade,
+        theme=valid_theme,
+        category=question.category,
+        difficulty=question.difficulty or "medium",
+        is_active=True
+    )
     db.add(db_question)
     db.commit()
     db.refresh(db_question)
@@ -173,8 +279,33 @@ async def update_question(
     if not db_question:
         raise HTTPException(status_code=404, detail="Soru bulunamadı")
 
-    for key, value in question.model_dump().items():
-        setattr(db_question, key, value)
+    q_text = question.question_text.strip()
+    c_answer = question.correct_answer.strip()
+    if not q_text or not c_answer:
+        raise HTTPException(status_code=400, detail="Soru ve doğru cevap alanları zorunludur!")
+
+    try:
+        valid_grade, valid_theme = validate_grade_and_theme(question.grade, question.theme)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    raw_unacceptable = (
+        question.unacceptable_answers
+        if question.unacceptable_answers is not None
+        else question.acceptable_answers
+    )
+    cleaned_unacceptable = raw_unacceptable.strip() if raw_unacceptable and raw_unacceptable.strip() else None
+
+    db_question.question_text = q_text
+    db_question.correct_answer = c_answer
+    db_question.unacceptable_answers = cleaned_unacceptable
+    db_question.acceptable_answers = cleaned_unacceptable
+    db_question.grade = valid_grade
+    db_question.theme = valid_theme
+    if question.category is not None:
+        db_question.category = question.category
+    if question.difficulty:
+        db_question.difficulty = question.difficulty
 
     db.commit()
     db.refresh(db_question)
@@ -245,16 +376,16 @@ async def reset_room(room_code: str):
     # Asılı task'ları iptal et
     cancel_all_room_tasks(room_code)
 
+    # Odadaki oyunculara bildir (odadan çıkarmadan önce!)
+    await sio.emit('room_reset', {
+        'message': 'Oda admin tarafından sıfırlandı. Ana sayfaya yönlendiriliyorsunuz...'
+    }, room=room_code)
+
     # Socket tracking'den oyuncuları temizle
     players_to_remove = [sid for sid, code in socket_rooms.items() if code == room_code]
     for player_sid in players_to_remove:
         await sio.leave_room(player_sid, room_code)
         del socket_rooms[player_sid]
-
-    # Odadaki oyunculara bildir
-    await sio.emit('room_reset', {
-        'message': 'Oda admin tarafından sıfırlandı. Ana sayfaya yönlendiriliyorsunuz...'
-    }, room=room_code)
 
     # Odayı sıfırla
     game_manager.reset_room(room_code)
@@ -291,13 +422,11 @@ async def get_users(db: Session = Depends(get_db)):
 app.mount("/socket.io", socket_app)
 
 
-# Başlangıçta veritabanını initialize et
 @app.get("/api/stats", response_model=GameStatsResponse)
 async def get_stats(db: Session = Depends(get_db)):
     """İstatistikleri getir"""
     stats = db.query(GameStats).first()
     if not stats:
-        # İlk kez çağrılıyorsa boş stats oluştur
         stats = GameStats()
         db.add(stats)
         db.commit()
@@ -307,9 +436,8 @@ async def get_stats(db: Session = Depends(get_db)):
 
 @app.on_event("startup")
 async def startup_event():
-    print("LugaToz sunucusu baslatiliyor...")
+    print("Tarihoz sunucusu baslatiliyor...")
     init_db()
-    # Istatistik kaydi olustur
     from .database import SessionLocal
     db = SessionLocal()
     try:

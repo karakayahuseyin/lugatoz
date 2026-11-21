@@ -20,13 +20,16 @@ class Question(Base):
     id = Column(Integer, primary_key=True, index=True)
     question_text = Column(Text, nullable=False)
     correct_answer = Column(String(500), nullable=False)  # Görünür doğru cevap
-    acceptable_answers = Column(Text, nullable=True)  # Virgülle ayrılmış kabul edilebilir cevaplar
+    unacceptable_answers = Column(Text, nullable=True)  # Virgülle ayrılmış kabul edilmeyecek yanıtlar
+    acceptable_answers = Column(Text, nullable=True)  # Geriye dönük uyumluluk için
+    grade = Column(String(50), nullable=True, index=True)  # "5", "6", "7", "8", "dunyanin_enleri"
+    theme = Column(String(100), nullable=True, index=True)  # Tema ID (Dünyanın Enleri için None)
     category = Column(String(100), nullable=True)
     difficulty = Column(String(20), default="medium")  # easy, medium, hard
     is_active = Column(Boolean, default=True)
 
     def __repr__(self):
-        return f"<Question(id={self.id}, text='{self.question_text[:50]}...')>"
+        return f"<Question(id={self.id}, grade='{self.grade}', theme='{self.theme}', text='{self.question_text[:50]}...')>"
 
 
 class GameSession(Base):

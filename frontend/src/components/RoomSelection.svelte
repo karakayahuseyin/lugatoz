@@ -3,9 +3,13 @@
   import HowToPlay from './HowToPlay.svelte';
   import { userStore } from '../stores/userStore';
   import { socketManager } from '../utils/socket';
+  import { DEFAULT_CURRICULUM, formatTopicLabel } from '../utils/curriculum';
 
   export let playerName = '';
+  export let selectedGrade = null;
+  export let selectedTheme = null;
   export let onRoomSelect = () => {};
+  export let onBack = () => {};
 
   let rooms = [];
   let loading = true;
@@ -15,15 +19,17 @@
   let loadingStats = false;
 
   $: userId = $userStore.userId;
+  $: selectedTopicLabel = formatTopicLabel(DEFAULT_CURRICULUM, selectedGrade, selectedTheme);
 
   onMount(async () => {
     await loadRooms();
 
-    // Cleanup on unmount
     return () => {
       const socket = socketManager.getSocket();
-      socket.off('user_stats_data');
-      socket.off('user_stats_error');
+      if (socket) {
+        socket.off('user_stats_data');
+        socket.off('user_stats_error');
+      }
     };
   });
 
@@ -41,8 +47,24 @@
     }
   }
 
-  function selectRoom(roomCode) {
-    onRoomSelect(roomCode);
+  function isRoomSameTopic(room) {
+    if (!room.grade) return false;
+    return room.grade === selectedGrade && (room.theme || null) === (selectedTheme || null);
+  }
+
+  function canJoinRoom(room) {
+    if (!room.available) return false;
+    if (room.players.length === 0) return true;
+    return isRoomSameTopic(room);
+  }
+
+  function isRoomDifferentTopic(room) {
+    return room.phase === 'waiting' && room.players.length > 0 && !isRoomSameTopic(room);
+  }
+
+  function selectRoom(room) {
+    if (!canJoinRoom(room)) return;
+    onRoomSelect(room.room_code);
   }
 
   function refreshRooms() {
@@ -66,8 +88,11 @@
 
     loadingStats = true;
     const socket = socketManager.getSocket();
+    if (!socket) {
+      loadingStats = false;
+      return;
+    }
 
-    // Remove any existing listeners to avoid duplicates
     socket.off('user_stats_data');
     socket.off('user_stats_error');
 
@@ -102,11 +127,21 @@
   }
 </script>
 
-<div class="card max-w-4xl w-full">
-  <div class="text-center mb-8">
+<div class="card max-w-4xl w-full my-4">
+  <div class="text-center mb-6">
     <h1 class="text-4xl font-bold text-primary mb-2">ODA SEÇİMİ</h1>
     <p class="text-gray-600">Hoş geldin, <strong>{playerName}</strong>!</p>
-    <p class="text-sm text-gray-500 mt-1">Katılmak istediğin odayı seç</p>
+
+    {#if selectedTopicLabel}
+      <div class="mt-3 inline-flex items-center gap-2 bg-gradient-to-r from-cyan-50 to-lime-50 border-2 border-cyan-300 text-cyan-900 px-4 py-2 rounded-full text-sm font-bold">
+        <span>{selectedGrade === 'dunyanin_enleri' ? '🌍' : '📚'}</span>
+        <span>{selectedTopicLabel}</span>
+      </div>
+    {/if}
+
+    <p class="text-xs text-gray-500 mt-2">
+      Boş bir odaya veya aynı konudaki bekleyen odaya katılabilirsiniz
+    </p>
   </div>
 
   {#if loading}
@@ -116,24 +151,29 @@
   {:else}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       {#each rooms as room}
+        {@const joinable = canJoinRoom(room)}
+        {@const sameTopic = isRoomSameTopic(room)}
+        {@const diffTopic = isRoomDifferentTopic(room)}
         <button
-          on:click={() => selectRoom(room.room_code)}
-          disabled={!room.available}
-          class="text-left p-6 rounded-lg border-2 transition-all {
-            room.available
-              ? 'border-cyan-200 hover:border-cyan-400 hover:shadow-lg bg-white cursor-pointer'
-              : 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+          on:click={() => selectRoom(room)}
+          disabled={!joinable}
+          class="text-left p-5 rounded-xl border-2 transition-all {
+            joinable
+              ? sameTopic
+                ? 'border-lime-400 hover:border-lime-500 hover:shadow-lg bg-lime-50/40 cursor-pointer'
+                : 'border-cyan-200 hover:border-cyan-400 hover:shadow-lg bg-white cursor-pointer'
+              : 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-65'
           }"
         >
-          <div class="flex justify-between items-start mb-3">
+          <div class="flex justify-between items-start mb-2">
             <div>
-              <h3 class="font-semibold text-base text-gray-800">{room.name}</h3>
+              <h3 class="font-bold text-base text-gray-800">{room.name}</h3>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-sm {room.available ? 'text-cyan-600' : 'text-gray-500'} font-semibold">
+              <span class="text-sm {joinable ? 'text-cyan-600' : 'text-gray-500'} font-semibold">
                 {room.players.length}/{room.max_players}
               </span>
-              <span class="w-3 h-3 rounded-full {room.available ? 'bg-green-500' : 'bg-red-500'}"></span>
+              <span class="w-3 h-3 rounded-full {joinable ? 'bg-green-500' : 'bg-red-400'}"></span>
             </div>
           </div>
 
@@ -141,17 +181,35 @@
             {room.description}
           </p>
 
+          {#if room.topic}
+            <div class="mb-3">
+              <span class="inline-block text-xs font-semibold px-2.5 py-1 rounded-md {
+                sameTopic
+                  ? 'bg-lime-100 text-lime-800 border border-lime-300'
+                  : 'bg-amber-100 text-amber-800 border border-amber-200'
+              }">
+                {room.grade === 'dunyanin_enleri' ? '🌍' : '📚'} {room.topic.label}
+              </span>
+            </div>
+          {/if}
+
           <div class="flex justify-between items-center">
             <span class="text-xs px-2 py-1 rounded-full {
               room.phase === 'waiting' ? 'bg-cyan-100 text-cyan-700' : 'bg-yellow-100 text-yellow-700'
             }">
-              {room.phase === 'waiting' ? 'Bekliyor' : 'Oyunda'}
+              {room.phase === 'waiting' ? (room.players.length === 0 ? 'Boş' : 'Bekliyor') : 'Oyunda'}
             </span>
 
-            {#if room.available}
-              <span class="text-cyan-600 font-semibold text-sm">Katıl →</span>
+            {#if joinable}
+              <span class="{sameTopic ? 'text-lime-700' : 'text-cyan-600'} font-semibold text-sm">
+                {sameTopic ? 'Aynı Konu • Katıl →' : 'Katıl →'}
+              </span>
+            {:else if diffTopic}
+              <span class="text-amber-600 text-xs font-semibold">Farklı bölüm/tema</span>
             {:else}
-              <span class="text-gray-400 text-sm">{room.phase === 'waiting' ? 'Dolu' : 'Oyun devam ediyor'}</span>
+              <span class="text-gray-400 text-sm">
+                {room.phase === 'waiting' ? 'Dolu' : 'Oyun devam ediyor'}
+              </span>
             {/if}
           </div>
         </button>
@@ -159,12 +217,12 @@
     </div>
   {/if}
 
-  <div class="mt-6 flex justify-center gap-6">
+  <div class="mt-6 flex flex-wrap justify-center gap-6">
     <button
-      on:click={() => window.location.reload()}
+      on:click={onBack}
       class="text-cyan-600 hover:text-cyan-700 font-semibold text-sm"
     >
-      ← Geri Dön
+      ← Bölüm / Tema Değiştir
     </button>
     <button
       on:click={refreshRooms}
@@ -201,7 +259,6 @@
   <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" on:click={toggleStats} on:keydown={(e) => e.key === 'Escape' && toggleStats()} role="dialog" aria-modal="true" tabindex="-1">
     <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
     <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl" on:click|stopPropagation on:keydown|stopPropagation role="document">
-      <!-- Header -->
       <div class="bg-gradient-to-r from-purple-500 to-pink-500 p-6 text-white">
         <div class="flex justify-between items-center">
           <div>
@@ -221,7 +278,6 @@
         </div>
       </div>
 
-      <!-- Content -->
       <div class="p-6 overflow-y-auto" style="max-height: calc(90vh - 140px);">
         {#if loadingStats}
           <div class="text-center py-12">
@@ -230,7 +286,6 @@
           </div>
         {:else if userStats}
           <div class="space-y-4">
-            <!-- Genel İstatistikler -->
             <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 border-2 border-purple-200">
               <h3 class="text-lg font-bold text-gray-800 mb-3">🎮 Genel</h3>
               <div class="grid grid-cols-2 gap-3">
@@ -253,7 +308,6 @@
               </div>
             </div>
 
-            <!-- Başarı Oranları -->
             <div class="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-xl p-4 border-2 border-cyan-200">
               <h3 class="text-lg font-bold text-gray-800 mb-3">📈 Başarı Oranları</h3>
               <div class="grid grid-cols-3 gap-3">
@@ -272,12 +326,11 @@
               </div>
             </div>
 
-            <!-- Soru İstatistikleri -->
             <div class="bg-gradient-to-r from-green-50 to-lime-50 rounded-xl p-4 border-2 border-green-200">
-              <h3 class="text-lg font-bold text-gray-800 mb-3">❓ Sorular</h3>
+              <h3 class="text-lg font-bold text-gray-800 mb-3">❓ Eşleştirme</h3>
               <div class="grid grid-cols-3 gap-3">
                 <div class="bg-white rounded-lg p-3">
-                  <p class="text-xs text-gray-600">Toplam Soru</p>
+                  <p class="text-xs text-gray-600">Toplam Kavram</p>
                   <p class="text-xl font-bold text-gray-700">{userStats.total_questions_answered}</p>
                 </div>
                 <div class="bg-white rounded-lg p-3">
@@ -291,7 +344,6 @@
               </div>
             </div>
 
-            <!-- Yanıltma İstatistikleri -->
             <div class="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl p-4 border-2 border-orange-200">
               <h3 class="text-lg font-bold text-gray-800 mb-3">🎭 Yanıltma</h3>
               <div class="grid grid-cols-2 gap-3">

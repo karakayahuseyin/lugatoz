@@ -1,4 +1,5 @@
 <script>
+  import { onMount, onDestroy } from 'svelte';
   import { gameState, updateGameState } from '../stores/gameStore';
   import { socketManager } from '../utils/socket';
   import { notifications } from '../stores/notificationStore';
@@ -22,17 +23,14 @@
     socketManager.emit('submit_vote', {
       answer: selectedAnswer
     });
-    // Don't set votedAnswer here - wait for backend confirmation
   }
 
   function handleTimeout() {
     timeoutReached = true;
-    // Auto-submit if user has selected something
     if (selectedAnswer) {
       submitVote();
     } else {
       notifications.error('Süre doldu! Cevap seçmediniz, -100 puan cezası aldınız.');
-      // Submit empty to trigger penalty
       socketManager.emit('submit_vote', {
         answer: ''
       });
@@ -40,25 +38,41 @@
     }
   }
 
-  // Listen for success from backend
-  socketManager.on('vote_submitted', (data) => {
+  function handleVoteSubmitted(data) {
     if (data.success) {
       if (timer) timer.stop();
       updateGameState({ votedAnswer: true });
     }
-  });
+  }
 
-  // Listen for error from backend
-  socketManager.on('vote_rejected', (data) => {
+  function handleVoteRejected(data) {
     if (data.reason === 'own_answer') {
       notifications.error('Kendi yanlış cevabınızı seçemezsiniz!');
       selectedAnswer = null;
     }
+  }
+
+  onMount(() => {
+    socketManager.on('vote_submitted', handleVoteSubmitted);
+    socketManager.on('vote_rejected', handleVoteRejected);
+  });
+
+  onDestroy(() => {
+    socketManager.off('vote_submitted', handleVoteSubmitted);
+    socketManager.off('vote_rejected', handleVoteRejected);
   });
 </script>
 
 <div class="card max-w-3xl w-full">
   <div class="mb-6">
+    {#if $gameState.topic}
+      <div class="text-center mb-3">
+        <span class="inline-block text-xs font-bold bg-cyan-100 text-cyan-800 px-3 py-1 rounded-full">
+          {$gameState.topic.grade === 'dunyanin_enleri' ? '🌍' : '📚'} {$gameState.topic.label}
+        </span>
+      </div>
+    {/if}
+
     <div class="flex justify-between items-center mb-4">
       <span class="bg-secondary text-white px-4 py-2 rounded-full font-semibold">
         Soru {$gameState.currentRound + 1} / {$gameState.maxRounds}

@@ -4,29 +4,33 @@
   import { socketManager } from '../utils/socket';
 
   function restartGame() {
-    // Admin yeni oyun baslatir
     socketManager.emit('restart_game', {});
   }
 
   function returnToLobby() {
-    // Admin lobiye doner
     socketManager.emit('return_to_lobby', {});
   }
 
   function leaveGame() {
-    // Oyundan cik
+    socketManager.emit('leave_room', {});
     socketManager.clearRoomInfo();
     resetGameState();
   }
 
   $: winner = $gameState.leaderboard?.[0];
   $: myAnswers = $gameState.playerId ? $gameState.results?.player_answers?.[$gameState.playerId] : null;
-  $: isHost = $gameState.players?.find(p => p.socket_id === $gameState.playerId)?.is_host || false;
+  $: myFinalScore = $gameState.playerId ? $gameState.results?.final_scores?.[$gameState.playerId] : null;
+  $: isHost = $gameState.players?.find((p) => p.socket_id === $gameState.playerId)?.is_host || false;
 </script>
 
-<div class="card max-w-4xl w-full">
+<div class="card max-w-4xl w-full my-4">
   <div class="text-center mb-8">
-    <div class="text-8xl mb-4">🏆</div>
+    {#if $gameState.topic}
+      <span class="inline-block text-xs font-bold bg-cyan-100 text-cyan-800 px-3 py-1 rounded-full mb-3">
+        {$gameState.topic.grade === 'dunyanin_enleri' ? '🌍' : '📚'} {$gameState.topic.label}
+      </span>
+    {/if}
+    <div class="text-7xl mb-3">🏆</div>
     <h1 class="text-5xl font-bold text-primary mb-4">Oyun Bitti!</h1>
 
     {#if winner}
@@ -43,7 +47,7 @@
     <div class="space-y-3">
       {#each $gameState.leaderboard as player, i}
         {@const colors = getPlayerColor(player.color)}
-        <div class="flex items-center gap-4 bg-gradient-to-r {colors.gradient} border-2 {colors.border} p-5 rounded-xl shadow-md transition-all {i === 0 ? 'scale-105' : ''}">
+        <div class="flex items-center gap-4 bg-gradient-to-r {colors.gradient} border-2 {colors.border} p-5 rounded-xl shadow-md transition-all {i === 0 ? 'scale-[1.02]' : ''}">
           <span class="text-4xl w-14 text-center">
             {#if i === 0}🥇
             {:else if i === 1}🥈
@@ -52,8 +56,7 @@
             {/if}
           </span>
           <span class="flex-1 font-bold text-xl {colors.text}">{player.name}</span>
-          <span class="font-bold text-3xl {colors.text
-          }">{player.score}</span>
+          <span class="font-bold text-3xl {colors.text}">{player.score}</span>
         </div>
       {/each}
     </div>
@@ -61,33 +64,36 @@
 
   {#if myAnswers && $gameState.results?.questions_summary}
     <div class="mb-6">
-      <h3 class="font-semibold text-gray-700 mb-4 text-xl">Final Test Sonuçlarınız</h3>
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+        <h3 class="font-semibold text-gray-700 text-xl">Kavram Eşleştirme Sonuçlarınız</h3>
+        {#if myFinalScore}
+          <span class="text-sm font-bold px-3 py-1 rounded-full bg-cyan-100 text-cyan-800">
+            {myFinalScore.correct_count} / {$gameState.results.questions_summary.length} Doğru (+{myFinalScore.bonus_score} puan)
+          </span>
+        {/if}
+      </div>
+
       <div class="space-y-3 bg-gray-50 p-4 rounded-lg border-2 border-gray-200">
         {#each $gameState.results.questions_summary as q, i}
-          {@const myAnswer = myAnswers.find(a => a.question_index === i)}
-          <div class="bg-white p-4 rounded-lg border-2 {myAnswer?.is_correct ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}">
+          {@const myAnswer = myAnswers.find((a) => a.question_index === i)}
+          <div class="p-4 rounded-lg border-2 {myAnswer?.is_correct ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}">
             <p class="font-semibold text-gray-800 mb-2">
               {i + 1}. {q.question}
             </p>
             <div class="space-y-1">
               {#if myAnswer?.user_answer}
                 <p class="text-sm {myAnswer.is_correct ? 'text-green-700' : 'text-red-700'} font-semibold">
-                  {myAnswer.is_correct ? '✓' : '✗'} Cevabınız: {myAnswer.user_answer}
+                  {myAnswer.is_correct ? '✓' : '✗'} Eşleştirdiğiniz kavram: {myAnswer.user_answer}
                 </p>
               {:else}
                 <p class="text-sm text-gray-500 italic">
-                  Cevap vermediniz
+                  Eşleştirme yapmadınız
                 </p>
               {/if}
               {#if !myAnswer?.is_correct}
                 <p class="text-sm text-green-700 font-semibold">
-                  ✓ Doğru cevap: {q.correct_answer}
+                  ✓ Doğru kavram: {q.correct_answer}
                 </p>
-                {#if q.acceptable_answers}
-                  <p class="text-xs text-green-600">
-                    Kabul edilebilir cevaplar: {q.acceptable_answers}
-                  </p>
-                {/if}
               {/if}
             </div>
           </div>
@@ -108,7 +114,13 @@
         on:click={returnToLobby}
         class="btn btn-secondary w-full text-lg py-3"
       >
-        Lobiye Dön
+        Lobiye Dön (Konu Değiştirilebilir)
+      </button>
+      <button
+        on:click={leaveGame}
+        class="btn btn-outline w-full text-gray-600"
+      >
+        Oyundan Çık
       </button>
     </div>
   {:else}
@@ -123,15 +135,6 @@
         Oyundan Çık
       </button>
     </div>
-  {/if}
-
-  {#if isHost}
-    <button
-      on:click={leaveGame}
-      class="btn btn-outline w-full mt-3 text-gray-600"
-    >
-      Oyundan Cik
-    </button>
   {/if}
 
   <div class="mt-6 text-center text-gray-600">
