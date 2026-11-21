@@ -63,9 +63,11 @@ def init_db():
     migrate_db()
     print("Veritabani tablolari hazir")
 
-    # Veritabanı tamamen boşsa başlangıç için örnek Tarihöz soruları ekle
+    # Varsayılan temaları ve boşsa örnek soruları oluştur
+    from .curriculum import seed_default_themes
     db = SessionLocal()
     try:
+        seed_default_themes(db)
         if db.query(Question).count() == 0:
             sample_questions = [
                 # 5. Sınıf - 1. Birlikte Yaşamak

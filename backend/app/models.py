@@ -13,6 +13,24 @@ def generate_user_id():
     return random.randint(10000, 99999)
 
 
+class Theme(Base):
+    """Dynamic theme model for grades 5, 6, 7, 8"""
+    __tablename__ = "themes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    grade = Column(String(50), nullable=False, index=True)  # "5", "6", "7", "8"
+    slug = Column(String(100), nullable=False, index=True)  # matches Question.theme
+    name = Column(String(255), nullable=False)
+    display_order = Column(Integer, nullable=False, default=1)
+
+    __table_args__ = (
+        UniqueConstraint("grade", "slug", name="uq_themes_grade_slug"),
+    )
+
+    def __repr__(self):
+        return f"<Theme(id={self.id}, grade='{self.grade}', slug='{self.slug}', name='{self.name}')>"
+
+
 class Question(Base):
     """Question model"""
     __tablename__ = "questions"

@@ -21,6 +21,12 @@
   let editingQuestion = null;
   let saving = false;
 
+  // Theme management state (ekle / düzenle / sil / sırala)
+  let showAddThemeForm = false;
+  let newThemeName = '';
+  let editingTheme = null; // { db_id, name }
+  let savingTheme = false;
+
   // Feedback banner
   let feedback = null; // { type: 'success' | 'error', text: string }
   let feedbackTimer = null;
@@ -122,6 +128,9 @@
     selectedTheme = null;
     editingQuestion = null;
     showAddForm = false;
+    showAddThemeForm = false;
+    editingTheme = null;
+    newThemeName = '';
     feedback = null;
 
     const sec = sections.find((s) => s.id === gradeId);
@@ -136,6 +145,8 @@
     selectedTheme = themeId;
     editingQuestion = null;
     showAddForm = false;
+    showAddThemeForm = false;
+    editingTheme = null;
     feedback = null;
     await loadTopicQuestions();
   }
@@ -146,6 +157,8 @@
     questions = [];
     editingQuestion = null;
     showAddForm = false;
+    showAddThemeForm = false;
+    editingTheme = null;
     feedback = null;
   }
 
@@ -154,7 +167,127 @@
     questions = [];
     editingQuestion = null;
     showAddForm = false;
+    showAddThemeForm = false;
+    editingTheme = null;
     feedback = null;
+  }
+
+  async function addTheme() {
+    const name = newThemeName.trim();
+    if (!name) {
+      showFeedback('Tema adı zorunludur!', 'error');
+      return;
+    }
+
+    savingTheme = true;
+    try {
+      const response = await fetch('/api/themes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          grade: selectedGrade,
+          name
+        })
+      });
+
+      if (response.ok) {
+        newThemeName = '';
+        showFeedback('Tema başarıyla eklendi!', 'success');
+        await loadCurriculum();
+      } else {
+        const err = await response.json().catch(() => ({}));
+        showFeedback(err.detail || 'Tema eklenemedi!', 'error');
+      }
+    } catch (error) {
+      console.error('Tema eklenemedi:', error);
+      showFeedback('Tema eklenirken bir hata oluştu!', 'error');
+    } finally {
+      savingTheme = false;
+    }
+  }
+
+  function startEditTheme(theme) {
+    editingTheme = { db_id: theme.db_id, name: theme.name };
+    showAddThemeForm = false;
+  }
+
+  function cancelEditTheme() {
+    editingTheme = null;
+  }
+
+  async function updateTheme() {
+    if (!editingTheme) return;
+    const name = editingTheme.name.trim();
+    if (!name) {
+      showFeedback('Tema adı zorunludur!', 'error');
+      return;
+    }
+
+    savingTheme = true;
+    try {
+      const response = await fetch(`/api/themes/${editingTheme.db_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+
+      if (response.ok) {
+        editingTheme = null;
+        showFeedback('Tema adı güncellendi!', 'success');
+        await loadCurriculum();
+      } else {
+        const err = await response.json().catch(() => ({}));
+        showFeedback(err.detail || 'Tema güncellenemedi!', 'error');
+      }
+    } catch (error) {
+      console.error('Tema güncellenemedi:', error);
+      showFeedback('Tema güncellenirken bir hata oluştu!', 'error');
+    } finally {
+      savingTheme = false;
+    }
+  }
+
+  async function moveTheme(theme, direction) {
+    try {
+      const response = await fetch(`/api/themes/${theme.db_id}/move`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ direction })
+      });
+      if (response.ok) {
+        await loadCurriculum();
+      }
+    } catch (error) {
+      console.error('Tema sırası güncellenemedi:', error);
+    }
+  }
+
+  async function deleteTheme(theme) {
+    const msg = theme.total_questions > 0
+      ? `"${theme.full_name}" temasında ${theme.total_questions} soru bulunuyor! Temayı silerseniz bu sorular da KALICI olarak silinecektir. Devam etmek istiyor musunuz?`
+      : `"${theme.full_name}" temasını silmek istediğinizden emin misiniz?`;
+
+    if (!confirm(msg)) return;
+
+    try {
+      const response = await fetch(`/api/themes/${theme.db_id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        if (editingTheme?.db_id === theme.db_id) {
+          editingTheme = null;
+        }
+        showFeedback('Tema silindi!', 'success');
+        await loadCurriculum();
+      } else {
+        const err = await response.json().catch(() => ({}));
+        showFeedback(err.detail || 'Tema silinemedi!', 'error');
+      }
+    } catch (error) {
+      console.error('Tema silinemedi:', error);
+      showFeedback('Tema silinirken bir hata oluştu!', 'error');
+    }
   }
 
   async function addQuestion() {
@@ -574,51 +707,184 @@
               </div>
             {/if}
 
-          <!-- SEVİYE 2: TEMA SEÇİMİ (5, 6, 7, 8. Sınıflar için) -->
+          <!-- SEVİYE 2: TEMA SEÇİMİ VE YÖNETİMİ (5, 6, 7, 8. Sınıflar için) -->
           {:else if selectedSection && selectedSection.has_themes && !selectedThemeObj}
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
               <div>
                 <h2 class="text-2xl font-bold text-gray-800">{selectedSection.name} — Temalar</h2>
                 <p class="text-sm text-gray-500">
-                  Soru eklemek veya düzenlemek istediğiniz temayı seçin ({selectedSection.themes.length} tema).
+                  Tema ekleyin, düzenleyin, silin veya sorularını yönetmek için bir temayı açın ({selectedSection.themes.length} tema).
                 </p>
               </div>
-              <button
-                on:click={goToSections}
-                class="btn btn-secondary text-sm py-2 px-4 self-start"
-              >
-                ← Bölümlere Dön
-              </button>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  on:click={goToSections}
+                  class="px-4 py-2.5 rounded-lg border-2 border-gray-300 text-gray-700 font-semibold text-sm hover:bg-gray-100"
+                >
+                  ← Bölümlere Dön
+                </button>
+                <button
+                  on:click={() => { showAddThemeForm = !showAddThemeForm; editingTheme = null; }}
+                  class="btn btn-success text-sm py-2.5 px-5"
+                >
+                  {showAddThemeForm ? 'Formu Kapat' : '+ Yeni Tema Ekle'}
+                </button>
+              </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {#each selectedSection.themes as theme}
+            <!-- Bilgilendirme Banner -->
+            {#if feedback}
+              <div class="mb-5 px-4 py-3 rounded-xl border-2 text-sm font-semibold flex items-center justify-between {
+                feedback.type === 'success'
+                  ? 'bg-green-50 border-green-300 text-green-800'
+                  : 'bg-red-50 border-red-300 text-red-800'
+              }">
+                <span>{feedback.type === 'success' ? '✓' : '⚠'} {feedback.text}</span>
+                <button on:click={() => feedback = null} class="text-xs underline ml-4">Kapat</button>
+              </div>
+            {/if}
+
+            <!-- YENİ TEMA EKLEME FORMU -->
+            {#if showAddThemeForm}
+              <div class="bg-cyan-50/70 p-5 rounded-xl border-2 border-cyan-300 mb-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-3">{selectedSection.name} — Yeni Tema Ekle</h3>
+                <form on:submit|preventDefault={addTheme} class="flex flex-col sm:flex-row gap-3">
+                  <input
+                    id="new-theme-name"
+                    type="text"
+                    bind:value={newThemeName}
+                    placeholder="Tema adını yazın (örn: Kültür ve Miras)"
+                    class="input flex-1"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    disabled={savingTheme}
+                    class="btn btn-primary whitespace-nowrap {savingTheme ? 'opacity-50 cursor-not-allowed' : ''}"
+                  >
+                    {savingTheme ? 'Ekleniyor...' : 'Tema Ekle'}
+                  </button>
+                </form>
+              </div>
+            {/if}
+
+            <!-- TEMA DÜZENLEME FORMU -->
+            {#if editingTheme}
+              <div class="bg-yellow-50 p-5 rounded-xl border-2 border-yellow-300 mb-6">
+                <div class="flex items-center justify-between mb-3">
+                  <h3 class="text-lg font-bold text-gray-800">Tema Adını Düzenle</h3>
+                  <button
+                    type="button"
+                    on:click={cancelEditTheme}
+                    class="text-gray-500 hover:text-gray-700 font-semibold text-sm"
+                  >
+                    ✕ İptal
+                  </button>
+                </div>
+                <form on:submit|preventDefault={updateTheme} class="flex flex-col sm:flex-row gap-3">
+                  <input
+                    id="edit-theme-name"
+                    type="text"
+                    bind:value={editingTheme.name}
+                    placeholder="Yeni tema adını yazın..."
+                    class="input flex-1"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    disabled={savingTheme}
+                    class="btn btn-primary whitespace-nowrap {savingTheme ? 'opacity-50 cursor-not-allowed' : ''}"
+                  >
+                    {savingTheme ? 'Kaydediliyor...' : 'Kaydet'}
+                  </button>
+                </form>
+              </div>
+            {/if}
+
+            {#if selectedSection.themes.length === 0}
+              <div class="bg-gray-50 p-10 rounded-xl border-2 border-dashed border-gray-300 text-center">
+                <p class="text-gray-600 text-lg font-semibold">Bu sınıfta henüz tema bulunmuyor.</p>
+                <p class="text-gray-400 text-sm mt-1 mb-4">İlk temayı eklemek için aşağıdaki butona tıklayın.</p>
                 <button
-                  on:click={() => selectTheme(theme.id)}
-                  class="text-left p-5 rounded-xl border-2 border-gray-200 bg-gray-50/70 hover:border-cyan-400 hover:bg-cyan-50/50 hover:shadow-md transition-all flex items-start justify-between gap-4 group"
+                  on:click={() => showAddThemeForm = true}
+                  class="btn btn-success text-sm"
                 >
-                  <div class="flex items-start gap-3">
-                    <span class="flex-shrink-0 w-9 h-9 rounded-xl bg-cyan-500 text-white font-bold text-base flex items-center justify-center shadow-sm">
-                      {theme.order}
-                    </span>
-                    <div>
-                      <h3 class="font-bold text-gray-800 text-base group-hover:text-cyan-800 leading-snug">
-                        {theme.name}
-                      </h3>
-                      <p class="text-xs text-gray-500 mt-1.5">
-                        <strong>{theme.total_questions}</strong> soru
-                        {#if theme.total_questions > 0}
-                          <span class="text-gray-400">({theme.active_questions} aktif)</span>
-                        {/if}
-                      </p>
+                  + İlk Temayı Ekle
+                </button>
+              </div>
+            {:else}
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {#each selectedSection.themes as theme, tIdx (theme.db_id || theme.id)}
+                  <div class="rounded-xl border-2 border-gray-200 bg-gray-50/70 hover:border-cyan-400 hover:bg-cyan-50/40 hover:shadow-md transition-all flex flex-col justify-between">
+                    <button
+                      type="button"
+                      on:click={() => selectTheme(theme.id)}
+                      class="w-full text-left p-5 pb-3 flex items-start justify-between gap-4 group"
+                    >
+                      <div class="flex items-start gap-3 min-w-0">
+                        <span class="flex-shrink-0 w-9 h-9 rounded-xl bg-cyan-500 text-white font-bold text-base flex items-center justify-center shadow-sm">
+                          {theme.order}
+                        </span>
+                        <div class="min-w-0">
+                          <h3 class="font-bold text-gray-800 text-base group-hover:text-cyan-800 leading-snug">
+                            {theme.name}
+                          </h3>
+                          <p class="text-xs text-gray-500 mt-1.5">
+                            <strong>{theme.total_questions}</strong> soru
+                            {#if theme.total_questions > 0}
+                              <span class="text-gray-400">({theme.active_questions} aktif)</span>
+                            {/if}
+                          </p>
+                        </div>
+                      </div>
+                      <span class="flex-shrink-0 text-xs font-bold text-cyan-600 mt-1 group-hover:translate-x-1 transition-transform">
+                        Sorular →
+                      </span>
+                    </button>
+
+                    <div class="px-5 py-2.5 border-t border-gray-200/80 flex items-center justify-between gap-2 bg-white/60 rounded-b-xl">
+                      <div class="flex items-center gap-1">
+                        <button
+                          type="button"
+                          on:click={() => moveTheme(theme, 'up')}
+                          disabled={tIdx === 0}
+                          class="px-2 py-1 rounded text-xs font-bold border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Yukarı taşı"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          on:click={() => moveTheme(theme, 'down')}
+                          disabled={tIdx === selectedSection.themes.length - 1}
+                          class="px-2 py-1 rounded text-xs font-bold border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Aşağı taşı"
+                        >
+                          ↓
+                        </button>
+                      </div>
+
+                      <div class="flex items-center gap-2">
+                        <button
+                          type="button"
+                          on:click={() => startEditTheme(theme)}
+                          class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-lime-100 text-lime-800 hover:bg-lime-200 transition-colors"
+                        >
+                          Düzenle
+                        </button>
+                        <button
+                          type="button"
+                          on:click={() => deleteTheme(theme)}
+                          class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+                        >
+                          Sil
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <span class="flex-shrink-0 text-xs font-bold text-cyan-600 mt-1 group-hover:translate-x-1 transition-transform">
-                    Aç →
-                  </span>
-                </button>
-              {/each}
-            </div>
+                {/each}
+              </div>
+            {/if}
 
           <!-- SEVİYE 3: SORULAR LİSTESİ & EKLE / DÜZENLE / SİL -->
           {:else if isViewingQuestions}

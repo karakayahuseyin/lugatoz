@@ -3,7 +3,7 @@
   import HowToPlay from './HowToPlay.svelte';
   import { userStore } from '../stores/userStore';
   import { socketManager } from '../utils/socket';
-  import { DEFAULT_CURRICULUM, formatTopicLabel } from '../utils/curriculum';
+  import { DEFAULT_CURRICULUM, fetchCurriculum, formatTopicLabel } from '../utils/curriculum';
 
   export let playerName = '';
   export let selectedGrade = null;
@@ -11,6 +11,7 @@
   export let onRoomSelect = () => {};
   export let onBack = () => {};
 
+  let sections = DEFAULT_CURRICULUM;
   let rooms = [];
   let loading = true;
   let showHowToPlay = false;
@@ -19,10 +20,11 @@
   let loadingStats = false;
 
   $: userId = $userStore.userId;
-  $: selectedTopicLabel = formatTopicLabel(DEFAULT_CURRICULUM, selectedGrade, selectedTheme);
+  $: selectedTopicLabel = formatTopicLabel(sections, selectedGrade, selectedTheme);
 
   onMount(async () => {
-    await loadRooms();
+    const [currData] = await Promise.all([fetchCurriculum(), loadRooms()]);
+    sections = currData.sections;
 
     return () => {
       const socket = socketManager.getSocket();

@@ -224,38 +224,44 @@
         <span class="text-xs text-gray-500">Yalnızca seçtiğiniz temadan sorular gelir</span>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-        {#each selectedSection.themes as theme}
-          {@const isThemeSelected = selectedTheme === theme.id}
-          <button
-            type="button"
-            on:click={() => selectTheme(theme.id)}
-            class="p-3 rounded-lg border-2 text-left transition-all duration-150 flex items-start justify-between gap-2 {
-              isThemeSelected
-                ? 'border-cyan-500 bg-cyan-500 text-white shadow-md'
-                : 'border-gray-200 bg-white hover:border-cyan-400 hover:bg-cyan-50/50 text-gray-800'
-            }"
-          >
-            <div class="flex items-start gap-2.5 min-w-0">
-              <span class="flex-shrink-0 w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center mt-0.5 {
-                isThemeSelected ? 'bg-white text-cyan-600' : 'bg-cyan-100 text-cyan-700'
+      {#if selectedSection.themes.length === 0}
+        <p class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-center">
+          Bu sınıfta henüz tema bulunmuyor. Admin panelinden tema ekleyebilirsiniz.
+        </p>
+      {:else}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {#each selectedSection.themes as theme}
+            {@const isThemeSelected = selectedTheme === theme.id}
+            <button
+              type="button"
+              on:click={() => selectTheme(theme.id)}
+              class="p-3 rounded-lg border-2 text-left transition-all duration-150 flex items-start justify-between gap-2 {
+                isThemeSelected
+                  ? 'border-cyan-500 bg-cyan-500 text-white shadow-md'
+                  : 'border-gray-200 bg-white hover:border-cyan-400 hover:bg-cyan-50/50 text-gray-800'
+              }"
+            >
+              <div class="flex items-start gap-2.5 min-w-0">
+                <span class="flex-shrink-0 w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center mt-0.5 {
+                  isThemeSelected ? 'bg-white text-cyan-600' : 'bg-cyan-100 text-cyan-700'
+                }">
+                  {theme.order}
+                </span>
+                <span class="text-sm font-semibold leading-snug">{theme.name}</span>
+              </div>
+              <span class="flex-shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full mt-0.5 {
+                isThemeSelected
+                  ? 'bg-white/25 text-white'
+                  : theme.active_questions > 0
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-gray-100 text-gray-400'
               }">
-                {theme.order}
+                {theme.active_questions} soru
               </span>
-              <span class="text-sm font-semibold leading-snug">{theme.name}</span>
-            </div>
-            <span class="flex-shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full mt-0.5 {
-              isThemeSelected
-                ? 'bg-white/25 text-white'
-                : theme.active_questions > 0
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-gray-100 text-gray-400'
-            }">
-              {theme.active_questions} soru
-            </span>
-          </button>
-        {/each}
-      </div>
+            </button>
+          {/each}
+        </div>
+      {/if}
 
       {#if selectedThemeObj && selectedThemeObj.active_questions === 0}
         <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3">

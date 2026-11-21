@@ -1,80 +1,136 @@
 # -*- coding: utf-8 -*-
-"""Tarihöz müfredat yapısı: Sınıflar, Temalar ve Dünyanın Enleri"""
+"""Tarihöz müfredat yapısı: Sınıflar, dinamik Temalar ve Dünyanın Enleri"""
+import re
 from typing import Dict, List, Optional, Tuple
+from sqlalchemy.orm import Session
 
-COMMON_THEMES_5_6_7 = [
-    {"id": "birlikte_yasamak", "order": 1, "name": "Birlikte Yaşamak", "full_name": "1. Birlikte Yaşamak"},
-    {"id": "evimiz_dunya", "order": 2, "name": "Evimiz Dünya", "full_name": "2. Evimiz Dünya"},
-    {"id": "ortak_mirasimiz", "order": 3, "name": "Ortak Mirasımız", "full_name": "3. Ortak Mirasımız"},
-    {"id": "yasayan_demokrasimiz", "order": 4, "name": "Yaşayan Demokrasimiz", "full_name": "4. Yaşayan Demokrasimiz"},
-    {"id": "hayatimizdaki_ekonomi", "order": 5, "name": "Hayatımızdaki Ekonomi", "full_name": "5. Hayatımızdaki Ekonomi"},
-    {"id": "teknoloji_ve_sosyal_bilimler", "order": 6, "name": "Teknoloji ve Sosyal Bilimler", "full_name": "6. Teknoloji ve Sosyal Bilimler"},
+from .models import Theme
+
+DEFAULT_THEMES_5_6_7 = [
+    {"slug": "birlikte_yasamak", "order": 1, "name": "Birlikte Yaşamak"},
+    {"slug": "evimiz_dunya", "order": 2, "name": "Evimiz Dünya"},
+    {"slug": "ortak_mirasimiz", "order": 3, "name": "Ortak Mirasımız"},
+    {"slug": "yasayan_demokrasimiz", "order": 4, "name": "Yaşayan Demokrasimiz"},
+    {"slug": "hayatimizdaki_ekonomi", "order": 5, "name": "Hayatımızdaki Ekonomi"},
+    {"slug": "teknoloji_ve_sosyal_bilimler", "order": 6, "name": "Teknoloji ve Sosyal Bilimler"},
 ]
 
-THEMES_8 = [
-    {"id": "bir_kahraman_doguyor", "order": 1, "name": "Bir Kahraman Doğuyor", "full_name": "1. Bir Kahraman Doğuyor"},
-    {"id": "milli_uyanis", "order": 2, "name": "Millî Uyanış: Bağımsızlık Yolunda Atılan Adımlar", "full_name": "2. Millî Uyanış: Bağımsızlık Yolunda Atılan Adımlar"},
-    {"id": "milli_bir_destan", "order": 3, "name": "Millî Bir Destan: Ya İstiklal Ya Ölüm!", "full_name": "3. Millî Bir Destan: Ya İstiklal Ya Ölüm!"},
-    {"id": "ataturkculuk_ve_cagdaslasan_turkiye", "order": 4, "name": "Atatürkçülük ve Çağdaşlaşan Türkiye", "full_name": "4. Atatürkçülük ve Çağdaşlaşan Türkiye"},
-    {"id": "demokratiklesme_cabalari", "order": 5, "name": "Demokratikleşme Çabaları", "full_name": "5. Demokratikleşme Çabaları"},
-    {"id": "ataturk_donemi_turk_dis_politikasi", "order": 6, "name": "Atatürk Dönemi Türk Dış Politikası", "full_name": "6. Atatürk Dönemi Türk Dış Politikası"},
-    {"id": "ataturkun_olumu_ve_sonrasi", "order": 7, "name": "Atatürk'ün Ölümü ve Sonrası", "full_name": "7. Atatürk'ün Ölümü ve Sonrası"},
+DEFAULT_THEMES_8 = [
+    {"slug": "bir_kahraman_doguyor", "order": 1, "name": "Bir Kahraman Doğuyor"},
+    {"slug": "milli_uyanis", "order": 2, "name": "Millî Uyanış: Bağımsızlık Yolunda Atılan Adımlar"},
+    {"slug": "milli_bir_destan", "order": 3, "name": "Millî Bir Destan: Ya İstiklal Ya Ölüm!"},
+    {"slug": "ataturkculuk_ve_cagdaslasan_turkiye", "order": 4, "name": "Atatürkçülük ve Çağdaşlaşan Türkiye"},
+    {"slug": "demokratiklesme_cabalari", "order": 5, "name": "Demokratikleşme Çabaları"},
+    {"slug": "ataturk_donemi_turk_dis_politikasi", "order": 6, "name": "Atatürk Dönemi Türk Dış Politikası"},
+    {"slug": "ataturkun_olumu_ve_sonrasi", "order": 7, "name": "Atatürk'ün Ölümü ve Sonrası"},
 ]
 
-CURRICULUM: List[Dict] = [
-    {
-        "id": "5",
-        "name": "5. Sınıf",
-        "short_name": "5. Sınıf",
-        "has_themes": True,
-        "themes": [dict(t) for t in COMMON_THEMES_5_6_7],
-    },
-    {
-        "id": "6",
-        "name": "6. Sınıf",
-        "short_name": "6. Sınıf",
-        "has_themes": True,
-        "themes": [dict(t) for t in COMMON_THEMES_5_6_7],
-    },
-    {
-        "id": "7",
-        "name": "7. Sınıf",
-        "short_name": "7. Sınıf",
-        "has_themes": True,
-        "themes": [dict(t) for t in COMMON_THEMES_5_6_7],
-    },
-    {
-        "id": "8",
-        "name": "8. Sınıf",
-        "short_name": "8. Sınıf",
-        "has_themes": True,
-        "themes": [dict(t) for t in THEMES_8],
-    },
-    {
-        "id": "dunyanin_enleri",
-        "name": "Dünyanın Enleri",
-        "short_name": "Dünyanın Enleri",
-        "has_themes": False,
-        "themes": [],
-    },
+SECTIONS: List[Dict] = [
+    {"id": "5", "name": "5. Sınıf", "short_name": "5. Sınıf", "has_themes": True},
+    {"id": "6", "name": "6. Sınıf", "short_name": "6. Sınıf", "has_themes": True},
+    {"id": "7", "name": "7. Sınıf", "short_name": "7. Sınıf", "has_themes": True},
+    {"id": "8", "name": "8. Sınıf", "short_name": "8. Sınıf", "has_themes": True},
+    {"id": "dunyanin_enleri", "name": "Dünyanın Enleri", "short_name": "Dünyanın Enleri", "has_themes": False},
 ]
 
-_SECTION_MAP: Dict[str, Dict] = {section["id"]: section for section in CURRICULUM}
-_THEME_MAP: Dict[str, Dict[str, Dict]] = {
-    section["id"]: {theme["id"]: theme for theme in section["themes"]}
-    for section in CURRICULUM
-}
+_SECTION_MAP: Dict[str, Dict] = {section["id"]: section for section in SECTIONS}
 
 
-def get_curriculum() -> List[Dict]:
-    """Return a copy of the curriculum catalog."""
-    return [
-        {
-            **section,
-            "themes": [dict(t) for t in section["themes"]],
-        }
-        for section in CURRICULUM
-    ]
+def slugify_turkish(text: str) -> str:
+    """Create an ASCII-safe slug from Turkish text."""
+    tr_map = {
+        'İ': 'i', 'I': 'i', 'ı': 'i', 'î': 'i', 'Î': 'i',
+        'Ş': 's', 'ş': 's',
+        'Ğ': 'g', 'ğ': 'g',
+        'Ü': 'u', 'ü': 'u', 'û': 'u', 'Û': 'u',
+        'Ö': 'o', 'ö': 'o',
+        'Ç': 'c', 'ç': 'c',
+        'â': 'a', 'Â': 'a',
+    }
+    mapped = ''.join(tr_map.get(ch, ch.lower()) for ch in text.strip())
+    slug = re.sub(r'[^a-z0-9]+', '_', mapped).strip('_')
+    return (slug[:80] or 'tema')
+
+
+def generate_unique_slug(db: Session, grade: str, name: str) -> str:
+    """Generate a slug unique within the given grade."""
+    base = slugify_turkish(name)
+    existing = {
+        row[0]
+        for row in db.query(Theme.slug).filter(Theme.grade == grade).all()
+    }
+    if base not in existing:
+        return base
+
+    suffix = 2
+    while f"{base}_{suffix}" in existing:
+        suffix += 1
+    return f"{base}_{suffix}"
+
+
+def _with_session(db: Optional[Session]):
+    """Return (session, should_close)."""
+    if db is not None:
+        return db, False
+    from .database import SessionLocal
+    return SessionLocal(), True
+
+
+def seed_default_themes(db: Session):
+    """Seed initial default themes when the themes table is empty."""
+    if db.query(Theme).count() > 0:
+        return
+
+    rows: List[Theme] = []
+    for grade_id in ("5", "6", "7"):
+        for t in DEFAULT_THEMES_5_6_7:
+            rows.append(Theme(
+                grade=grade_id,
+                slug=t["slug"],
+                name=t["name"],
+                display_order=t["order"],
+            ))
+    for t in DEFAULT_THEMES_8:
+        rows.append(Theme(
+            grade="8",
+            slug=t["slug"],
+            name=t["name"],
+            display_order=t["order"],
+        ))
+    db.add_all(rows)
+    db.commit()
+    print(f"{len(rows)} varsayilan tema olusturuldu")
+
+
+def get_curriculum(db: Optional[Session] = None) -> List[Dict]:
+    """Return all sections with their live themes from the database."""
+    session, should_close = _with_session(db)
+    try:
+        themes_db = (
+            session.query(Theme)
+            .order_by(Theme.grade.asc(), Theme.display_order.asc(), Theme.id.asc())
+            .all()
+        )
+        themes_by_grade: Dict[str, List[Dict]] = {}
+        for t in themes_db:
+            themes_by_grade.setdefault(t.grade, []).append({
+                "db_id": t.id,
+                "id": t.slug,
+                "order": t.display_order,
+                "name": t.name,
+                "full_name": f"{t.display_order}. {t.name}",
+            })
+
+        return [
+            {
+                **section,
+                "themes": themes_by_grade.get(section["id"], []) if section["has_themes"] else [],
+            }
+            for section in SECTIONS
+        ]
+    finally:
+        if should_close:
+            session.close()
 
 
 def is_valid_grade(grade: Optional[str]) -> bool:
@@ -86,30 +142,51 @@ def grade_has_themes(grade: Optional[str]) -> bool:
     return bool(section and section["has_themes"])
 
 
-def is_valid_theme(grade: Optional[str], theme: Optional[str]) -> bool:
+def is_valid_theme(grade: Optional[str], theme: Optional[str], db: Optional[Session] = None) -> bool:
     if not is_valid_grade(grade):
         return False
     if not grade_has_themes(grade):
         return not theme
-    return bool(theme and theme in _THEME_MAP.get(grade, {}))
+    if not theme:
+        return False
+
+    session, should_close = _with_session(db)
+    try:
+        exists = (
+            session.query(Theme.id)
+            .filter(Theme.grade == grade, Theme.slug == theme)
+            .first()
+        )
+        return exists is not None
+    finally:
+        if should_close:
+            session.close()
 
 
-def validate_grade_and_theme(grade: Optional[str], theme: Optional[str]) -> Tuple[str, Optional[str]]:
-    """Validate and normalize (grade, theme). Raises ValueError if invalid."""
+def validate_grade_and_theme(
+    grade: Optional[str],
+    theme: Optional[str],
+    db: Optional[Session] = None
+) -> Tuple[str, Optional[str]]:
+    """Validate and normalize (grade, theme) against live database themes."""
     if not grade or not is_valid_grade(grade):
         raise ValueError("Geçersiz bölüm veya sınıf seçimi!")
 
     if not grade_has_themes(grade):
         return grade, None
 
-    if not theme or not is_valid_theme(grade, theme):
+    if not theme or not is_valid_theme(grade, theme, db=db):
         raise ValueError("Seçilen sınıf için geçerli bir tema seçilmelidir!")
 
     return grade, theme
 
 
-def get_topic_info(grade: Optional[str], theme: Optional[str]) -> Optional[Dict]:
-    """Return human-readable topic metadata for a (grade, theme) pair."""
+def get_topic_info(
+    grade: Optional[str],
+    theme: Optional[str],
+    db: Optional[Session] = None
+) -> Optional[Dict]:
+    """Return human-readable topic metadata using live database themes."""
     if not grade or grade not in _SECTION_MAP:
         return None
 
@@ -123,8 +200,7 @@ def get_topic_info(grade: Optional[str], theme: Optional[str]) -> Optional[Dict]
             "label": section["name"],
         }
 
-    theme_obj = _THEME_MAP.get(grade, {}).get(theme) if theme else None
-    if not theme_obj:
+    if not theme:
         return {
             "grade": section["id"],
             "grade_name": section["name"],
@@ -133,10 +209,31 @@ def get_topic_info(grade: Optional[str], theme: Optional[str]) -> Optional[Dict]
             "label": section["name"],
         }
 
+    session, should_close = _with_session(db)
+    try:
+        theme_obj = (
+            session.query(Theme)
+            .filter(Theme.grade == grade, Theme.slug == theme)
+            .first()
+        )
+    finally:
+        if should_close:
+            session.close()
+
+    if not theme_obj:
+        return {
+            "grade": section["id"],
+            "grade_name": section["name"],
+            "theme": theme,
+            "theme_name": theme,
+            "label": f"{section['name']} • {theme}",
+        }
+
+    full_name = f"{theme_obj.display_order}. {theme_obj.name}"
     return {
         "grade": section["id"],
         "grade_name": section["name"],
-        "theme": theme_obj["id"],
-        "theme_name": theme_obj["full_name"],
-        "label": f"{section['name']} • {theme_obj['full_name']}",
+        "theme": theme_obj.slug,
+        "theme_name": full_name,
+        "label": f"{section['name']} • {full_name}",
     }

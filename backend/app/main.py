@@ -7,8 +7,14 @@ from typing import Optional
 from pydantic import BaseModel
 
 from .database import get_db, init_db
-from .models import Question, GameStats, QuestionStats, User, UserStats
-from .curriculum import get_curriculum, validate_grade_and_theme, grade_has_themes
+from .models import Question, Theme, GameStats, QuestionStats, User, UserStats
+from .curriculum import (
+    get_curriculum,
+    validate_grade_and_theme,
+    grade_has_themes,
+    is_valid_grade,
+    generate_unique_slug,
+)
 from .websocket import socket_app
 
 # FastAPI uygulaması
@@ -57,6 +63,19 @@ class QuestionResponse(BaseModel):
         from_attributes = True
 
 
+class ThemeCreate(BaseModel):
+    grade: str
+    name: str
+
+
+class ThemeUpdate(BaseModel):
+    name: str
+
+
+class ThemeMove(BaseModel):
+    direction: str  # "up" | "down"
+
+
 class GameStatsResponse(BaseModel):
     id: int
     total_players: int
@@ -95,7 +114,7 @@ async def health_check():
 @app.get("/api/curriculum")
 async def get_curriculum_with_counts(db: Session = Depends(get_db)):
     """Sınıf, tema ve Dünyanın Enleri yapısını soru sayılarıyla birlikte döndür"""
-    sections = get_curriculum()
+    sections = get_curriculum(db)
 
     # Toplam ve aktif soru sayılarını tek sorguda topla
     counts_rows = (
@@ -141,6 +160,164 @@ async def get_curriculum_with_counts(db: Session = Depends(get_db)):
     return {
         "sections": sections,
         "uncategorized_questions": uncategorized_total
+    }
+
+
+def _resequence_grade_themes(db: Session, grade: str):
+    """Ensure display_order values for a grade are contiguous 1..N."""
+    remaining = (
+        db.query(Theme)
+        .filter(Theme.grade == grade)
+        .order_by(Theme.display_order.asc(), Theme.id.asc())
+        .all()
+    )
+    for idx, t in enumerate(remaining, start=1):
+        t.display_order = idx
+
+
+@app.post("/api/themes", status_code=201)
+async def create_theme(payload: ThemeCreate, db: Session = Depends(get_db)):
+    """Bir sınıf altına yeni tema ekle"""
+    if not is_valid_grade(payload.grade) or not grade_has_themes(payload.grade):
+        raise HTTPException(status_code=400, detail="Bu bölüm altına tema eklenemez!")
+
+    clean_name = " ".join(payload.name.strip().split())
+    if not clean_name:
+        raise HTTPException(status_code=400, detail="Tema adı zorunludur!")
+
+    existing_same = (
+        db.query(Theme)
+        .filter(Theme.grade == payload.grade, func.lower(Theme.name) == clean_name.lower())
+        .first()
+    )
+    if existing_same:
+        raise HTTPException(status_code=400, detail="Bu sınıfta aynı isimde bir tema zaten var!")
+
+    max_order = (
+        db.query(func.max(Theme.display_order))
+        .filter(Theme.grade == payload.grade)
+        .scalar()
+        or 0
+    )
+    slug = generate_unique_slug(db, payload.grade, clean_name)
+
+    db_theme = Theme(
+        grade=payload.grade,
+        slug=slug,
+        name=clean_name,
+        display_order=max_order + 1,
+    )
+    db.add(db_theme)
+    db.commit()
+    db.refresh(db_theme)
+
+    return {
+        "db_id": db_theme.id,
+        "id": db_theme.slug,
+        "grade": db_theme.grade,
+        "order": db_theme.display_order,
+        "name": db_theme.name,
+        "full_name": f"{db_theme.display_order}. {db_theme.name}",
+    }
+
+
+@app.put("/api/themes/{theme_id}")
+async def update_theme(theme_id: int, payload: ThemeUpdate, db: Session = Depends(get_db)):
+    """Tema adını güncelle"""
+    db_theme = db.query(Theme).filter(Theme.id == theme_id).first()
+    if not db_theme:
+        raise HTTPException(status_code=404, detail="Tema bulunamadı!")
+
+    clean_name = " ".join(payload.name.strip().split())
+    if not clean_name:
+        raise HTTPException(status_code=400, detail="Tema adı zorunludur!")
+
+    existing_same = (
+        db.query(Theme)
+        .filter(
+            Theme.grade == db_theme.grade,
+            Theme.id != theme_id,
+            func.lower(Theme.name) == clean_name.lower(),
+        )
+        .first()
+    )
+    if existing_same:
+        raise HTTPException(status_code=400, detail="Bu sınıfta aynı isimde başka bir tema zaten var!")
+
+    db_theme.name = clean_name
+    db.commit()
+    db.refresh(db_theme)
+
+    return {
+        "db_id": db_theme.id,
+        "id": db_theme.slug,
+        "grade": db_theme.grade,
+        "order": db_theme.display_order,
+        "name": db_theme.name,
+        "full_name": f"{db_theme.display_order}. {db_theme.name}",
+    }
+
+
+@app.patch("/api/themes/{theme_id}/move")
+async def move_theme(theme_id: int, payload: ThemeMove, db: Session = Depends(get_db)):
+    """Temanın sırasını yukarı/aşağı taşı"""
+    if payload.direction not in ("up", "down"):
+        raise HTTPException(status_code=400, detail="Geçersiz yön!")
+
+    db_theme = db.query(Theme).filter(Theme.id == theme_id).first()
+    if not db_theme:
+        raise HTTPException(status_code=404, detail="Tema bulunamadı!")
+
+    siblings = (
+        db.query(Theme)
+        .filter(Theme.grade == db_theme.grade)
+        .order_by(Theme.display_order.asc(), Theme.id.asc())
+        .all()
+    )
+    idx = next((i for i, t in enumerate(siblings) if t.id == theme_id), None)
+    if idx is None:
+        raise HTTPException(status_code=404, detail="Tema bulunamadı!")
+
+    swap_idx = idx - 1 if payload.direction == "up" else idx + 1
+    if 0 <= swap_idx < len(siblings):
+        siblings[idx], siblings[swap_idx] = siblings[swap_idx], siblings[idx]
+        for new_order, t in enumerate(siblings, start=1):
+            t.display_order = new_order
+        db.commit()
+
+    return {"message": "Tema sırası güncellendi"}
+
+
+@app.delete("/api/themes/{theme_id}")
+async def delete_theme(theme_id: int, db: Session = Depends(get_db)):
+    """Temayı ve altındaki soruları kalıcı olarak sil"""
+    db_theme = db.query(Theme).filter(Theme.id == theme_id).first()
+    if not db_theme:
+        raise HTTPException(status_code=404, detail="Tema bulunamadı!")
+
+    grade = db_theme.grade
+    slug = db_theme.slug
+
+    # Temaya ait soruları ve istatistiklerini temizle
+    theme_questions = (
+        db.query(Question.id)
+        .filter(Question.grade == grade, Question.theme == slug)
+        .all()
+    )
+    q_ids = [row[0] for row in theme_questions]
+    if q_ids:
+        db.query(QuestionStats).filter(QuestionStats.question_id.in_(q_ids)).delete(synchronize_session=False)
+        db.query(Question).filter(Question.id.in_(q_ids)).delete(synchronize_session=False)
+
+    db.delete(db_theme)
+    db.flush()
+    _resequence_grade_themes(db, grade)
+    db.commit()
+
+    return {
+        "message": "Tema silindi",
+        "id": theme_id,
+        "deleted_questions": len(q_ids),
     }
 
 
@@ -239,7 +416,7 @@ async def create_question(question: QuestionCreate, db: Session = Depends(get_db
         raise HTTPException(status_code=400, detail="Soru ve doğru cevap alanları zorunludur!")
 
     try:
-        valid_grade, valid_theme = validate_grade_and_theme(question.grade, question.theme)
+        valid_grade, valid_theme = validate_grade_and_theme(question.grade, question.theme, db=db)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -285,7 +462,7 @@ async def update_question(
         raise HTTPException(status_code=400, detail="Soru ve doğru cevap alanları zorunludur!")
 
     try:
-        valid_grade, valid_theme = validate_grade_and_theme(question.grade, question.theme)
+        valid_grade, valid_theme = validate_grade_and_theme(question.grade, question.theme, db=db)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
