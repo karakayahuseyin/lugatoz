@@ -105,7 +105,7 @@
 <div class="card max-w-2xl w-full my-4">
   <div class="text-center mb-6">
     <div class="mb-3 flex justify-center">
-      <img src="/tarihtoz-logo.png" alt="TarihTöz Logo" class="w-28 h-28 object-contain rounded-2xl" />
+      <img src="/tarihtoz-logo.svg" alt="TarihTöz Logo" class="w-32 h-32 object-contain" />
     </div>
 
     <h1 class="text-4xl md:text-5xl font-bold text-primary mb-1">TarihTöz</h1>

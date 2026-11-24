@@ -548,7 +548,7 @@
     <div class="max-w-md mx-auto mt-16">
       <div class="bg-white rounded-2xl shadow-2xl p-8">
         <div class="flex justify-center mb-3">
-          <img src="/tarihtoz-logo.png" alt="TarihTöz" class="w-24 h-24 object-contain rounded-2xl" />
+          <img src="/tarihtoz-logo.svg" alt="TarihTöz" class="w-28 h-28 object-contain" />
         </div>
         <h1 class="text-3xl font-bold text-primary text-center mb-2">TarihTöz Admin Paneli</h1>
         <p class="text-sm text-gray-500 text-center mb-6">Sınıf, Tema ve Soru Yönetimi</p>
@@ -589,7 +589,7 @@
       <div class="bg-white rounded-2xl shadow-xl p-6">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-5">
           <div class="flex items-center gap-3">
-            <img src="/tarihtoz-logo.png" alt="TarihTöz" class="w-12 h-12 object-contain rounded-xl" />
+            <img src="/tarihtoz-logo.svg" alt="TarihTöz" class="w-14 h-14 object-contain" />
             <div>
               <h1 class="text-3xl font-bold text-primary">TarihTöz Admin Paneli</h1>
               <p class="text-sm text-gray-500">Toplam {totalAllQuestions} soru • {users.length} kayıtlı kullanıcı</p>

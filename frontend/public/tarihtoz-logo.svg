@@ -1,0 +1,146 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="TarihTöz Logo">
+  <defs>
+    <linearGradient id="leftPage" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#58cde3"/>
+      <stop offset="100%" stop-color="#48c0d9"/>
+    </linearGradient>
+    <linearGradient id="rightPage" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#31b2d2"/>
+      <stop offset="100%" stop-color="#229ec1"/>
+    </linearGradient>
+    <linearGradient id="glassGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#bceaf5"/>
+      <stop offset="50%" stop-color="#afe3f0"/>
+      <stop offset="100%" stop-color="#92d4e6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- TARİHTÖZ rounded geometric vector wordmark (aligned with book width, identical on all devices) -->
+  <g transform="translate(256, 108) scale(0.88) translate(-240.5, -103)" fill="none" stroke="#184694" stroke-width="12.2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- T -->
+    <path d="M 43 76 H 81 M 62 76 V 130"/>
+    <!-- A -->
+    <path d="M 93 130 L 113 76 L 133 130 M 100 113 H 126"/>
+    <!-- R -->
+    <path d="M 151 130 V 76 H 171 C 182 76 187 82 187 91 C 187 100 182 105 171 105 H 151 M 169 105 L 187 130"/>
+    <!-- İ -->
+    <path d="M 207 76 V 130"/>
+    <circle cx="207" cy="56" r="6.6" fill="#184694" stroke="none"/>
+    <!-- H -->
+    <path d="M 230 76 V 130 M 268 76 V 130 M 230 103 H 268"/>
+    <!-- T -->
+    <path d="M 286 76 H 324 M 305 76 V 130"/>
+    <!-- Ö -->
+    <ellipse cx="361" cy="103" rx="22" ry="27"/>
+    <circle cx="351" cy="56" r="6.2" fill="#184694" stroke="none"/>
+    <circle cx="371" cy="56" r="6.2" fill="#184694" stroke="none"/>
+    <!-- Z -->
+    <path d="M 402 76 H 438 L 402 130 H 438"/>
+  </g>
+
+  <!-- Open Book -->
+  <!-- Left Page -->
+  <path
+    d="M 80 180
+       C 80 163, 94 153, 111 155
+       C 168 161, 220 175, 256 205
+       L 256 418
+       C 216 396, 164 391, 108 394
+       C 92 395, 80 384, 80 368 Z"
+    fill="url(#leftPage)"
+  />
+
+  <!-- Right Page -->
+  <path
+    d="M 432 180
+       C 432 163, 418 153, 401 155
+       C 344 161, 292 175, 256 205
+       L 256 418
+       C 296 396, 348 391, 404 394
+       C 420 395, 432 384, 432 368 Z"
+    fill="url(#rightPage)"
+  />
+
+  <!-- Subtle spine line -->
+  <path d="M 256 205 L 256 418" stroke="#1f92b3" stroke-width="2" opacity="0.3"/>
+
+  <!-- Hourglass -->
+  <g>
+    <!-- Glass interior fill -->
+    <path
+      d="M 202 272
+         L 310 272
+         L 310 304
+         C 310 339, 273 354, 268 368
+         C 273 382, 310 397, 310 432
+         L 310 464
+         L 202 464
+         L 202 432
+         C 202 397, 239 382, 244 368
+         C 239 354, 202 339, 202 304 Z"
+      fill="url(#glassGrad)"
+    />
+
+    <!-- Upper Sand -->
+    <path
+      d="M 219 313
+         L 293 313
+         C 288 334, 267 349, 256 363
+         C 245 349, 224 334, 219 313 Z"
+      fill="#4171b1"
+    />
+
+    <!-- Falling sand stream -->
+    <line x1="256" y1="362" x2="256" y2="424" stroke="#4171b1" stroke-width="4.5" stroke-linecap="round"/>
+
+    <!-- Lower Sand Mound -->
+    <path
+      d="M 215 460
+         C 224 438, 243 415, 256 404
+         C 269 415, 288 438, 297 460 Z"
+      fill="#4171b1"
+    />
+
+    <!-- Subtle glass highlight -->
+    <path
+      d="M 214 285 L 214 302 C 214 321, 226 335, 238 347"
+      fill="none"
+      stroke="#ffffff"
+      stroke-width="4"
+      stroke-linecap="round"
+      opacity="0.55"
+    />
+    <path
+      d="M 236 392 C 223 404, 214 419, 214 436 L 214 451"
+      fill="none"
+      stroke="#ffffff"
+      stroke-width="4"
+      stroke-linecap="round"
+      opacity="0.55"
+    />
+
+    <!-- Hourglass outer navy frame -->
+    <path
+      d="M 202 272
+         L 202 304
+         C 202 339, 239 354, 244 368
+         C 239 382, 202 397, 202 432
+         L 202 464
+         M 310 272
+         L 310 304
+         C 310 339, 273 354, 268 368
+         C 273 382, 310 397, 310 432
+         L 310 464"
+      fill="none"
+      stroke="#184694"
+      stroke-width="15"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+
+    <!-- Top Cap -->
+    <rect x="178" y="253" width="156" height="25" rx="12.5" fill="#184694"/>
+    <!-- Bottom Cap -->
+    <rect x="178" y="458" width="156" height="25" rx="12.5" fill="#184694"/>
+  </g>
+</svg>

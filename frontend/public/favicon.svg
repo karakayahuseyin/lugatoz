@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="TarihTöz">
+  <defs>
+    <linearGradient id="lp" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#58cde3"/>
+      <stop offset="100%" stop-color="#48c0d9"/>
+    </linearGradient>
+    <linearGradient id="rp" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#31b2d2"/>
+      <stop offset="100%" stop-color="#229ec1"/>
+    </linearGradient>
+    <linearGradient id="gg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#bceaf5"/>
+      <stop offset="50%" stop-color="#afe3f0"/>
+      <stop offset="100%" stop-color="#92d4e6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Open Book -->
+  <path
+    d="M 18 46
+       C 18 35, 27 28, 38 30
+       C 73 34, 105 43, 128 62
+       L 128 206
+       C 102 192, 69 188, 36 190
+       C 26 191, 18 184, 18 174 Z"
+    fill="url(#lp)"
+  />
+  <path
+    d="M 238 46
+       C 238 35, 229 28, 218 30
+       C 183 34, 151 43, 128 62
+       L 128 206
+       C 154 192, 187 188, 220 190
+       C 230 191, 238 184, 238 174 Z"
+    fill="url(#rp)"
+  />
+
+  <!-- Hourglass -->
+  <path
+    d="M 92 98
+       L 164 98
+       L 164 119
+       C 164 142, 140 152, 136 162
+       C 140 172, 164 182, 164 205
+       L 164 226
+       L 92 226
+       L 92 205
+       C 92 182, 116 172, 120 162
+       C 116 152, 92 142, 92 119 Z"
+    fill="url(#gg)"
+  />
+  <path
+    d="M 103 125 L 153 125 C 150 139, 135 149, 128 158 C 121 149, 106 139, 103 125 Z"
+    fill="#4171b1"
+  />
+  <line x1="128" y1="158" x2="128" y2="198" stroke="#4171b1" stroke-width="3.5" stroke-linecap="round"/>
+  <path
+    d="M 100 223 C 106 209, 119 193, 128 186 C 137 193, 150 209, 156 223 Z"
+    fill="#4171b1"
+  />
+  <path
+    d="M 92 98 L 92 119 C 92 142, 116 152, 120 162 C 116 172, 92 182, 92 205 L 92 226
+       M 164 98 L 164 119 C 164 142, 140 152, 136 162 C 140 172, 164 182, 164 205 L 164 226"
+    fill="none"
+    stroke="#184694"
+    stroke-width="11"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <rect x="76" y="84" width="104" height="19" rx="9.5" fill="#184694"/>
+  <rect x="76" y="221" width="104" height="19" rx="9.5" fill="#184694"/>
+</svg>
