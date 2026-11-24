@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { gameState, updateGameState, resetGameState, setError } from './stores/gameStore';
   import { socketManager } from './utils/socket';
+  import { getGuestSeenQuestions, setGuestSeenForTopic } from './utils/guestSeen';
   import { notifications } from './stores/notificationStore';
   import { userStore } from './stores/userStore';
 
@@ -55,6 +56,9 @@
         players: data.room_state.players,
         playerId: socket.id,
         roomCode: data.room_state.room_code,
+        roomName: data.room_state.room_name || null,
+        roomGroup: data.room_state.room_group || null,
+        roomIcon: data.room_state.room_icon || null,
         topic: data.room_state.topic,
         selectedGrade: data.room_state.grade,
         selectedTheme: data.room_state.theme,
@@ -230,6 +234,12 @@
       notifications.warning(data.message || 'Oda sıfırlandı.');
     });
 
+    socket.on('guest_seen_updated', (data) => {
+      if (data && data.topic_key) {
+        setGuestSeenForTopic(data.topic_key, data.seen_question_ids || []);
+      }
+    });
+
     socket.on('error', (data) => {
       setError(data.message);
     });
@@ -265,6 +275,7 @@
       socket.off('returned_to_lobby');
       socket.off('game_restarted');
       socket.off('room_reset');
+      socket.off('guest_seen_updated');
       socket.off('error');
       socket.off('name_taken');
       socketManager.disconnect();
@@ -294,7 +305,8 @@
       player_name: playerName,
       room_code: roomCode,
       grade: selectedGrade,
-      theme: selectedTheme
+      theme: selectedTheme,
+      guest_seen_questions: getGuestSeenQuestions()
     });
   }
 

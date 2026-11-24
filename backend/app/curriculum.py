@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
-"""Tarihöz müfredat yapısı: Sınıflar, dinamik Temalar ve Dünyanın Enleri"""
+"""TarihTöz müfredat yapısı: Sınıflar, dinamik Temalar, Tüm Temalar (Karışık) ve Dünyanın Enleri"""
 import re
 from typing import Dict, List, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from .models import Theme
+
+ALL_THEMES_SLUG = "__all__"
+ALL_THEMES_LABEL = "Tüm Temalar (Karışık)"
 
 DEFAULT_THEMES_5_6_7 = [
     {"slug": "birlikte_yasamak", "order": 1, "name": "Birlikte Yaşamak"},
@@ -36,6 +39,15 @@ SECTIONS: List[Dict] = [
 _SECTION_MAP: Dict[str, Dict] = {section["id"]: section for section in SECTIONS}
 
 
+def make_topic_key(grade: Optional[str], theme: Optional[str]) -> str:
+    """Create canonical scope key for seen-question tracking per section/topic."""
+    if not grade:
+        return ""
+    if not grade_has_themes(grade):
+        return grade
+    return f"{grade}:{theme or ALL_THEMES_SLUG}"
+
+
 def slugify_turkish(text: str) -> str:
     """Create an ASCII-safe slug from Turkish text."""
     tr_map = {
@@ -55,6 +67,8 @@ def slugify_turkish(text: str) -> str:
 def generate_unique_slug(db: Session, grade: str, name: str) -> str:
     """Generate a slug unique within the given grade."""
     base = slugify_turkish(name)
+    if base == ALL_THEMES_SLUG:
+        base = "tema"
     existing = {
         row[0]
         for row in db.query(Theme.slug).filter(Theme.grade == grade).all()
@@ -142,13 +156,20 @@ def grade_has_themes(grade: Optional[str]) -> bool:
     return bool(section and section["has_themes"])
 
 
-def is_valid_theme(grade: Optional[str], theme: Optional[str], db: Optional[Session] = None) -> bool:
+def is_valid_theme(
+    grade: Optional[str],
+    theme: Optional[str],
+    db: Optional[Session] = None,
+    allow_all: bool = False
+) -> bool:
     if not is_valid_grade(grade):
         return False
     if not grade_has_themes(grade):
         return not theme
     if not theme:
         return False
+    if allow_all and theme == ALL_THEMES_SLUG:
+        return True
 
     session, should_close = _with_session(db)
     try:
@@ -166,7 +187,8 @@ def is_valid_theme(grade: Optional[str], theme: Optional[str], db: Optional[Sess
 def validate_grade_and_theme(
     grade: Optional[str],
     theme: Optional[str],
-    db: Optional[Session] = None
+    db: Optional[Session] = None,
+    allow_all: bool = False
 ) -> Tuple[str, Optional[str]]:
     """Validate and normalize (grade, theme) against live database themes."""
     if not grade or not is_valid_grade(grade):
@@ -175,7 +197,7 @@ def validate_grade_and_theme(
     if not grade_has_themes(grade):
         return grade, None
 
-    if not theme or not is_valid_theme(grade, theme, db=db):
+    if not theme or not is_valid_theme(grade, theme, db=db, allow_all=allow_all):
         raise ValueError("Seçilen sınıf için geçerli bir tema seçilmelidir!")
 
     return grade, theme
@@ -197,6 +219,7 @@ def get_topic_info(
             "grade_name": section["name"],
             "theme": None,
             "theme_name": None,
+            "topic_key": make_topic_key(section["id"], None),
             "label": section["name"],
         }
 
@@ -206,7 +229,18 @@ def get_topic_info(
             "grade_name": section["name"],
             "theme": None,
             "theme_name": None,
+            "topic_key": make_topic_key(section["id"], None),
             "label": section["name"],
+        }
+
+    if theme == ALL_THEMES_SLUG:
+        return {
+            "grade": section["id"],
+            "grade_name": section["name"],
+            "theme": ALL_THEMES_SLUG,
+            "theme_name": ALL_THEMES_LABEL,
+            "topic_key": make_topic_key(section["id"], ALL_THEMES_SLUG),
+            "label": f"{section['name']} • {ALL_THEMES_LABEL}",
         }
 
     session, should_close = _with_session(db)
@@ -226,6 +260,7 @@ def get_topic_info(
             "grade_name": section["name"],
             "theme": theme,
             "theme_name": theme,
+            "topic_key": make_topic_key(section["id"], theme),
             "label": f"{section['name']} • {theme}",
         }
 
@@ -235,5 +270,6 @@ def get_topic_info(
         "grade_name": section["name"],
         "theme": theme_obj.slug,
         "theme_name": full_name,
+        "topic_key": make_topic_key(section["id"], theme_obj.slug),
         "label": f"{section['name']} • {full_name}",
     }

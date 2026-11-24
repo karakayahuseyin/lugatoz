@@ -1,13 +1,19 @@
 # -*- coding: utf-8 -*-
 import socketio
 import asyncio
-from typing import Dict, List
+from typing import Dict, List, Set, Tuple
 from datetime import datetime
 
-from .game_manager import game_manager, GamePhase, normalize_answer
-from .curriculum import validate_grade_and_theme, grade_has_themes, get_topic_info
+from .game_manager import game_manager, GamePhase, normalize_answer, select_non_repeating_questions
+from .curriculum import (
+    ALL_THEMES_SLUG,
+    validate_grade_and_theme,
+    grade_has_themes,
+    get_topic_info,
+    make_topic_key,
+)
 from .database import SessionLocal
-from .models import Question, GameStats, QuestionStats
+from .models import Question, GameStats, QuestionStats, UserSeenQuestion
 from .auth import (
     create_user,
     get_user_by_id,
@@ -75,7 +81,7 @@ def get_player_room(sid):
 
 
 def fetch_questions_for_room(room) -> List[Dict]:
-    """Fetch ONLY active questions strictly belonging to the room's selected grade and theme."""
+    """Fetch ONLY active questions strictly belonging to the room's selected grade and theme (or all themes of that grade)."""
     if not room or not room.grade:
         return []
 
@@ -89,7 +95,11 @@ def fetch_questions_for_room(room) -> List[Dict]:
         if grade_has_themes(room.grade):
             if not room.theme:
                 return []
-            query = query.filter(Question.theme == room.theme)
+            if room.theme == ALL_THEMES_SLUG:
+                # Tüm Temalar (Karışık): yalnızca bu sınıfa ait herhangi bir temadaki sorular
+                query = query.filter(Question.theme.isnot(None), Question.theme != "")
+            else:
+                query = query.filter(Question.theme == room.theme)
         else:
             # Dünyanın Enleri: yalnızca temasız bu bölüme ait sorular
             query = query.filter((Question.theme.is_(None)) | (Question.theme == ""))
@@ -108,6 +118,111 @@ def fetch_questions_for_room(room) -> List[Dict]:
             }
             for q in questions_db
         ]
+    finally:
+        db.close()
+
+
+def _sanitize_guest_seen(raw_seen) -> Dict[str, List[int]]:
+    """Validate guest seen questions dictionary sent from client localStorage."""
+    cleaned: Dict[str, List[int]] = {}
+    if not isinstance(raw_seen, dict):
+        return cleaned
+    for topic_key, q_list in raw_seen.items():
+        if not isinstance(topic_key, str) or len(topic_key) > 160:
+            continue
+        if isinstance(q_list, list):
+            valid_ids = []
+            for item in q_list:
+                try:
+                    valid_ids.append(int(item))
+                except (TypeError, ValueError):
+                    continue
+            cleaned[topic_key] = valid_ids
+    return cleaned
+
+
+def select_and_record_questions_for_room(
+    room,
+    pool: List[Dict]
+) -> Tuple[List[Dict], List[Tuple[str, str, List[int]]]]:
+    """
+    Pick up to max_rounds non-repeating questions for all players at the table,
+    persist updated seen lists for logged-in users in DB, and return guest updates
+    [(sid, topic_key, updated_seen_ids), ...] for localStorage sync.
+    """
+    topic_key = make_topic_key(room.grade, room.theme)
+    player_seen_sets: Dict[str, Set[int]] = {}
+    logged_in_user_ids: Dict[str, int] = {}
+
+    db = SessionLocal()
+    try:
+        # 1. Load each player's seen question IDs for this topic_key
+        for pid, player in room.players.items():
+            if player.user_id:
+                logged_in_user_ids[pid] = player.user_id
+                rows = (
+                    db.query(UserSeenQuestion.question_id)
+                    .filter(
+                        UserSeenQuestion.user_id == player.user_id,
+                        UserSeenQuestion.topic_key == topic_key
+                    )
+                    .all()
+                )
+                player_seen_sets[pid] = {row[0] for row in rows}
+            else:
+                guest_list = player.guest_seen_questions.get(topic_key, [])
+                player_seen_sets[pid] = set(guest_list)
+
+        # 2. Select non-repeating questions across all players at the table
+        chosen, updated_seen = select_non_repeating_questions(
+            pool,
+            player_seen_sets,
+            max_count=room.default_max_rounds
+        )
+
+        # 3. Persist updated seen sets (DB for logged-in users, memory + sync payload for guests)
+        guest_updates: List[Tuple[str, str, List[int]]] = []
+        processed_users: Set[int] = set()
+
+        for pid, new_seen_ids in updated_seen.items():
+            if pid in logged_in_user_ids:
+                uid = logged_in_user_ids[pid]
+                if uid in processed_users:
+                    continue
+                processed_users.add(uid)
+
+                existing_ids = player_seen_sets.get(pid, set())
+                if not new_seen_ids:
+                    # Cycle completed -> reset this user's seen list for this topic!
+                    db.query(UserSeenQuestion).filter(
+                        UserSeenQuestion.user_id == uid,
+                        UserSeenQuestion.topic_key == topic_key
+                    ).delete(synchronize_session=False)
+                else:
+                    # Remove stale/dropped IDs if any (e.g. if pre-reset happened)
+                    to_remove = existing_ids - new_seen_ids
+                    if to_remove:
+                        db.query(UserSeenQuestion).filter(
+                            UserSeenQuestion.user_id == uid,
+                            UserSeenQuestion.topic_key == topic_key,
+                            UserSeenQuestion.question_id.in_(list(to_remove))
+                        ).delete(synchronize_session=False)
+
+                    to_add = new_seen_ids - existing_ids
+                    for qid in to_add:
+                        db.add(UserSeenQuestion(
+                            user_id=uid,
+                            topic_key=topic_key,
+                            question_id=qid
+                        ))
+            else:
+                sorted_ids = sorted(new_seen_ids)
+                if pid in room.players:
+                    room.players[pid].guest_seen_questions[topic_key] = sorted_ids
+                guest_updates.append((pid, topic_key, sorted_ids))
+
+        db.commit()
+        return chosen, guest_updates
     finally:
         db.close()
 
@@ -173,6 +288,9 @@ async def handle_register_user(sid, data):
             return
 
         socket_users[sid] = user.user_id
+        current_room = get_player_room(sid)
+        if current_room and sid in current_room.players:
+            current_room.players[sid].user_id = user.user_id
 
         await sio.emit('register_success', {
             'user_id': user.user_id,
@@ -204,6 +322,9 @@ async def handle_login_user(sid, data):
 
         update_last_login(db, user.user_id)
         socket_users[sid] = user.user_id
+        current_room = get_player_room(sid)
+        if current_room and sid in current_room.players:
+            current_room.players[sid].user_id = user.user_id
 
         await sio.emit('login_success', {
             'user_id': user.user_id,
@@ -373,12 +494,12 @@ async def handle_join_game(sid, data):
         await sio.emit('error', {'message': 'Oyun zaten başladı!'}, room=sid)
         return
 
-    # Validate selected grade & theme
+    # Validate selected grade & theme (including Tüm Temalar / Karışık)
     validated_grade = None
     validated_theme = None
     if grade:
         try:
-            validated_grade, validated_theme = validate_grade_and_theme(grade, theme)
+            validated_grade, validated_theme = validate_grade_and_theme(grade, theme, allow_all=True)
         except ValueError as e:
             await sio.emit('error', {'message': str(e)}, room=sid)
             return
@@ -441,6 +562,8 @@ async def handle_join_game(sid, data):
 
     if sid in socket_users:
         room.players[sid].user_id = socket_users[sid]
+    else:
+        room.players[sid].guest_seen_questions = _sanitize_guest_seen(data.get('guest_seen_questions'))
 
     socket_rooms[sid] = room_code
     await sio.enter_room(sid, room.room_code)
@@ -472,7 +595,7 @@ async def handle_set_room_topic(sid, data):
         return
 
     try:
-        valid_grade, valid_theme = validate_grade_and_theme(data.get('grade'), data.get('theme'))
+        valid_grade, valid_theme = validate_grade_and_theme(data.get('grade'), data.get('theme'), allow_all=True)
     except ValueError as e:
         await sio.emit('error', {'message': str(e)}, room=sid)
         return
@@ -503,9 +626,9 @@ async def handle_start_game(sid, data):
         await sio.emit('error', {'message': 'Lütfen önce bölüm ve tema seçin!'}, room=sid)
         return
 
-    # Strictly fetch questions ONLY for this grade & theme
-    questions = fetch_questions_for_room(room)
-    if not questions:
+    # Strictly fetch questions ONLY for this grade & theme (or all themes of this grade)
+    pool = fetch_questions_for_room(room)
+    if not pool:
         topic_info = room.get_topic_info()
         label = topic_info['label'] if topic_info else 'seçili bölüm'
         await sio.emit('error', {
@@ -513,10 +636,18 @@ async def handle_start_game(sid, data):
         }, room=sid)
         return
 
-    success = room.start_game(questions)
+    selected_questions, guest_updates = select_and_record_questions_for_room(room, pool)
+    success = room.start_game(selected_questions, preselected=True)
     if not success:
         await sio.emit('error', {'message': 'Oyun başlatılamadı!'}, room=sid)
         return
+
+    # Sync updated seen question IDs back to guest browsers (localStorage)
+    for guest_sid, t_key, seen_ids in guest_updates:
+        await sio.emit('guest_seen_updated', {
+            'topic_key': t_key,
+            'seen_question_ids': seen_ids
+        }, room=guest_sid)
 
     # Update game statistics and question statistics
     db = SessionLocal()
@@ -1074,9 +1205,9 @@ async def handle_restart_game(sid, data):
     cancel_all_room_tasks(room_code)
     room = game_manager.reset_room_keep_players(room_code)
 
-    # Fetch ONLY questions for the room's selected grade & theme
-    questions_list = fetch_questions_for_room(room)
-    if not questions_list:
+    # Fetch ONLY questions for the room's selected grade & theme (non-repeating!)
+    pool = fetch_questions_for_room(room)
+    if not pool:
         topic_info = room.get_topic_info()
         label = topic_info['label'] if topic_info else 'seçili bölüm'
         await sio.emit('error', {
@@ -1084,7 +1215,14 @@ async def handle_restart_game(sid, data):
         }, room=sid)
         return
 
-    room.start_game(questions_list)
+    selected_questions, guest_updates = select_and_record_questions_for_room(room, pool)
+    room.start_game(selected_questions, preselected=True)
+
+    for guest_sid, t_key, seen_ids in guest_updates:
+        await sio.emit('guest_seen_updated', {
+            'topic_key': t_key,
+            'seen_question_ids': seen_ids
+        }, room=guest_sid)
 
     db = SessionLocal()
     try:

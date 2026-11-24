@@ -2,7 +2,12 @@
   import { onMount } from 'svelte';
   import { notifications } from '../stores/notificationStore';
   import { userStore } from '../stores/userStore';
-  import { DEFAULT_CURRICULUM, fetchCurriculum } from '../utils/curriculum';
+  import {
+    DEFAULT_CURRICULUM,
+    ALL_THEMES_SLUG,
+    ALL_THEMES_LABEL,
+    fetchCurriculum
+  } from '../utils/curriculum';
   import UserAuth from './UserAuth.svelte';
   import HowToPlay from './HowToPlay.svelte';
   import Leaderboard from './Leaderboard.svelte';
@@ -30,9 +35,15 @@
   $: selectedSection = sections.find((s) => s.id === selectedGrade) || null;
   $: gradeSections = sections.filter((s) => s.has_themes);
   $: specialSection = sections.find((s) => !s.has_themes) || null;
-  $: selectedThemeObj = selectedSection?.has_themes
+  $: isAllThemesSelected = selectedTheme === ALL_THEMES_SLUG;
+  $: selectedThemeObj = selectedSection?.has_themes && !isAllThemesSelected
     ? selectedSection.themes.find((t) => t.id === selectedTheme) || null
     : null;
+  $: selectedActiveQuestions = !selectedSection
+    ? 0
+    : !selectedSection.has_themes || isAllThemesSelected
+      ? selectedSection.active_questions
+      : (selectedThemeObj?.active_questions || 0);
   $: canContinue = Boolean(
     playerName.trim() &&
     selectedSection &&
@@ -94,10 +105,10 @@
 <div class="card max-w-2xl w-full my-4">
   <div class="text-center mb-6">
     <div class="mb-3 flex justify-center">
-      <img src="/lugatoz.png" alt="Tarihöz Logo" class="w-24 h-24 object-contain" />
+      <img src="/tarihtoz-logo.png" alt="TarihTöz Logo" class="w-28 h-28 object-contain rounded-2xl" />
     </div>
 
-    <h1 class="text-4xl md:text-5xl font-bold text-primary mb-1">Tarihöz</h1>
+    <h1 class="text-4xl md:text-5xl font-bold text-primary mb-1">TarihTöz</h1>
     <p class="text-gray-600 text-sm md:text-base">Tarih ve Sosyal Bilgiler Bilgi Yarışması</p>
     <p class="text-xs text-gray-500 mt-1">Sınıfını ve temanı seç, en fazla 4 kişiyle yarış!</p>
   </div>
@@ -229,6 +240,40 @@
           Bu sınıfta henüz tema bulunmuyor. Admin panelinden tema ekleyebilirsiniz.
         </p>
       {:else}
+        <!-- Tüm Temalar (Karışık) Butonu -->
+        <button
+          type="button"
+          on:click={() => selectTheme(ALL_THEMES_SLUG)}
+          class="w-full mb-3 p-3.5 rounded-xl border-2 text-left transition-all duration-150 flex items-center justify-between gap-3 {
+            isAllThemesSelected
+              ? 'border-lime-600 bg-gradient-to-r from-cyan-500 to-lime-500 text-white shadow-md'
+              : 'border-lime-300 bg-gradient-to-r from-cyan-50 to-lime-50 hover:border-cyan-500 text-gray-800'
+          }"
+        >
+          <div class="flex items-center gap-2.5">
+            <span class="flex-shrink-0 w-7 h-7 rounded-full text-sm flex items-center justify-center {
+              isAllThemesSelected ? 'bg-white/25 text-white' : 'bg-white text-cyan-600 shadow-sm'
+            }">
+              🎲
+            </span>
+            <div>
+              <div class="text-sm font-bold">{ALL_THEMES_LABEL}</div>
+              <div class="text-xs {isAllThemesSelected ? 'text-white/90' : 'text-gray-600'}">
+                {selectedSection.name} bütün temalarından rastgele sorular
+              </div>
+            </div>
+          </div>
+          <span class="flex-shrink-0 text-xs font-bold px-2.5 py-1 rounded-full {
+            isAllThemesSelected
+              ? 'bg-white/25 text-white'
+              : selectedSection.active_questions > 0
+                ? 'bg-lime-200 text-lime-800'
+                : 'bg-gray-200 text-gray-500'
+          }">
+            {selectedSection.active_questions} soru
+          </span>
+        </button>
+
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           {#each selectedSection.themes as theme}
             {@const isThemeSelected = selectedTheme === theme.id}
@@ -263,9 +308,9 @@
         </div>
       {/if}
 
-      {#if selectedThemeObj && selectedThemeObj.active_questions === 0}
+      {#if selectedTheme && selectedActiveQuestions === 0}
         <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3">
-          Bu temada henüz aktif soru bulunmuyor. Admin panelinden soru eklendikten sonra oyun başlatılabilir.
+          Bu bölümde henüz aktif soru bulunmuyor. Admin panelinden soru eklendikten sonra oyun başlatılabilir.
         </p>
       {/if}
     </div>

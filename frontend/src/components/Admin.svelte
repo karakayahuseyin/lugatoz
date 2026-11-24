@@ -35,6 +35,7 @@
   let stats = null;
   let users = [];
   let rooms = [];
+  let roomsFilter = 'all'; // 'all' | 'active'
   let roomsInterval = null;
 
   // 3 fields only for adding a question
@@ -446,6 +447,49 @@
     }
   }
 
+  async function deleteUser(user) {
+    if (!confirm(`"${user.username}" (ID: ${user.user_id}) kullanıcısını ve tüm puan/istatistiklerini KALICI olarak silmek istediğinizden emin misiniz?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/users/${user.user_id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        await loadUsers();
+      } else {
+        alert('Kullanıcı silinemedi!');
+      }
+    } catch (error) {
+      console.error('Kullanıcı silinemedi:', error);
+      alert('Kullanıcı silinirken bir hata oluştu!');
+    }
+  }
+
+  async function deleteAllUsers() {
+    if (!confirm(`Kayıtlı TÜM ${users.length} kullanıcı hesabı, puanları ve liderlik tablosu KALICI olarak silinecek (sorular korunur). Devam etmek istiyor musunuz?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/users', {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        await Promise.all([loadUsers(), loadStats()]);
+        alert('Tüm kullanıcılar ve liderlik tablosu sıfırlandı!');
+      } else {
+        alert('Kullanıcılar silinemedi!');
+      }
+    } catch (error) {
+      console.error('Kullanıcılar silinemedi:', error);
+      alert('Kullanıcılar silinirken bir hata oluştu!');
+    }
+  }
+
   async function loadRooms() {
     try {
       const response = await fetch('/api/rooms');
@@ -504,9 +548,9 @@
     <div class="max-w-md mx-auto mt-16">
       <div class="bg-white rounded-2xl shadow-2xl p-8">
         <div class="flex justify-center mb-3">
-          <img src="/lugatoz.png" alt="Tarihöz" class="w-20 h-20 object-contain" />
+          <img src="/tarihtoz-logo.png" alt="TarihTöz" class="w-24 h-24 object-contain rounded-2xl" />
         </div>
-        <h1 class="text-3xl font-bold text-primary text-center mb-2">Tarihöz Admin Paneli</h1>
+        <h1 class="text-3xl font-bold text-primary text-center mb-2">TarihTöz Admin Paneli</h1>
         <p class="text-sm text-gray-500 text-center mb-6">Sınıf, Tema ve Soru Yönetimi</p>
 
         <div class="space-y-4">
@@ -544,9 +588,12 @@
       <!-- Üst Başlık ve Sekmeler -->
       <div class="bg-white rounded-2xl shadow-xl p-6">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-5">
-          <div>
-            <h1 class="text-3xl font-bold text-primary">Tarihöz Admin Paneli</h1>
-            <p class="text-sm text-gray-500">Toplam {totalAllQuestions} soru • {users.length} kayıtlı kullanıcı</p>
+          <div class="flex items-center gap-3">
+            <img src="/tarihtoz-logo.png" alt="TarihTöz" class="w-12 h-12 object-contain rounded-xl" />
+            <div>
+              <h1 class="text-3xl font-bold text-primary">TarihTöz Admin Paneli</h1>
+              <p class="text-sm text-gray-500">Toplam {totalAllQuestions} soru • {users.length} kayıtlı kullanıcı</p>
+            </div>
           </div>
           <a href="/#" class="btn btn-secondary text-sm py-2 px-4">
             ← Oyuna Dön
@@ -572,7 +619,7 @@
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }"
           >
-            🏠 Odalar ({activeRoomsCount} aktif)
+            🏠 Masalar ({activeRoomsCount} aktif)
           </button>
           <button
             on:click={() => { activeTab = 'users'; loadUsers(); }}
@@ -1197,29 +1244,51 @@
           {/if}
         </div>
 
-      <!-- SEKME 2: ODALAR -->
+      <!-- SEKME 2: MASALAR -->
       {:else if activeTab === 'rooms'}
         <div class="bg-white rounded-2xl shadow-xl p-6 md:p-8">
-          <div class="flex justify-between items-center mb-4">
+          <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
             <h2 class="text-2xl font-bold text-gray-800">
-              Tüm Odalar ({rooms.length})
+              Tüm Masalar ({rooms.length})
               <span class="text-sm text-gray-400 font-normal ml-2">(5 sn'de bir güncellenir)</span>
             </h2>
-            <button on:click={loadRooms} class="text-sm text-cyan-600 font-semibold hover:underline">
-              🔄 Yenile
-            </button>
+            <div class="flex items-center gap-2">
+              <button
+                on:click={() => roomsFilter = 'all'}
+                class="text-xs font-bold px-3 py-1.5 rounded-full border {roomsFilter === 'all' ? 'bg-primary text-white border-primary' : 'bg-white text-gray-600 border-gray-300'}"
+              >
+                Tümü ({rooms.length})
+              </button>
+              <button
+                on:click={() => roomsFilter = 'active'}
+                class="text-xs font-bold px-3 py-1.5 rounded-full border {roomsFilter === 'active' ? 'bg-primary text-white border-primary' : 'bg-white text-gray-600 border-gray-300'}"
+              >
+                Aktif ({activeRoomsCount})
+              </button>
+              <button on:click={loadRooms} class="text-sm text-cyan-600 font-semibold hover:underline ml-2">
+                🔄 Yenile
+              </button>
+            </div>
           </div>
 
           <div class="space-y-3">
-            {#each rooms as room}
+            {#each (roomsFilter === 'active' ? rooms.filter((r) => r.players.length > 0) : rooms) as room}
               <div class="p-4 rounded-xl border-2 {
                 room.players.length === 0 ? 'bg-gray-50 border-gray-200' :
                 room.phase === 'waiting' ? 'bg-blue-50/70 border-blue-200' :
                 'bg-orange-50/70 border-orange-200'
               }">
                 <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
-                  <div class="flex items-center gap-2 flex-wrap">
+                  <div class="flex items-center gap-2.5 flex-wrap">
+                    {#if room.icon}
+                      <img src={room.icon} alt={room.name} class="w-9 h-9 rounded-lg flex-shrink-0" />
+                    {/if}
                     <h3 class="text-base font-bold text-gray-800">{room.name}</h3>
+                    {#if room.group}
+                      <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-200/80 text-gray-700">
+                        {room.group}
+                      </span>
+                    {/if}
                     <span class="text-xs font-semibold px-2 py-0.5 rounded-full {
                       room.phase === 'waiting' ? 'bg-blue-100 text-blue-700' :
                       room.phase === 'game_over' ? 'bg-gray-200 text-gray-700' :
@@ -1282,7 +1351,17 @@
       <!-- SEKME 3: KULLANICILAR -->
       {:else if activeTab === 'users'}
         <div class="bg-white rounded-2xl shadow-xl p-6 md:p-8">
-          <h2 class="text-2xl font-bold text-gray-800 mb-4">Kayıtlı Kullanıcılar ({users.length})</h2>
+          <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+            <h2 class="text-2xl font-bold text-gray-800">Kayıtlı Kullanıcılar ({users.length})</h2>
+            {#if users.length > 0}
+              <button
+                on:click={deleteAllUsers}
+                class="btn btn-danger text-xs py-2 px-4"
+              >
+                Tüm Kullanıcıları Sıfırla
+              </button>
+            {/if}
+          </div>
 
           {#if users.length === 0}
             <div class="bg-gray-50 p-8 rounded-lg border-2 border-gray-200 text-center">
@@ -1301,10 +1380,11 @@
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">En Yüksek</th>
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Doğruluk</th>
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Son Giriş</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">İşlem</th>
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
-                  {#each users as user}
+                  {#each users as user (user.user_id)}
                     <tr class="hover:bg-gray-50">
                       <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-primary">{user.user_id}</td>
                       <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{user.username}</td>
@@ -1319,6 +1399,14 @@
                       </td>
                       <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                         {new Date(user.last_login).toLocaleString('tr-TR')}
+                      </td>
+                      <td class="px-4 py-3 whitespace-nowrap text-right">
+                        <button
+                          on:click={() => deleteUser(user)}
+                          class="btn btn-danger text-xs py-1.5 px-3"
+                        >
+                          Sil
+                        </button>
                       </td>
                     </tr>
                   {/each}

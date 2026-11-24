@@ -3,7 +3,12 @@
   import { gameState, updateGameState } from '../stores/gameStore';
   import { socketManager } from '../utils/socket';
   import { notifications } from '../stores/notificationStore';
-  import { DEFAULT_CURRICULUM, fetchCurriculum } from '../utils/curriculum';
+  import {
+    DEFAULT_CURRICULUM,
+    ALL_THEMES_SLUG,
+    ALL_THEMES_LABEL,
+    fetchCurriculum
+  } from '../utils/curriculum';
   import HowToPlay from './HowToPlay.svelte';
   import { getPlayerColor } from '../utils/colors';
 
@@ -31,7 +36,7 @@
     if (!gradeId) return null;
     const sec = list.find((s) => s.id === gradeId);
     if (!sec) return null;
-    if (!sec.has_themes) return sec.active_questions;
+    if (!sec.has_themes || themeId === ALL_THEMES_SLUG) return sec.active_questions;
     const th = sec.themes.find((t) => t.id === themeId);
     return th ? th.active_questions : 0;
   }
@@ -84,7 +89,20 @@
 
 <div class="card max-w-2xl w-full my-4">
   <div class="text-center mb-6">
-    <h1 class="text-4xl font-bold text-primary mb-2">BEKLEME ODASI</h1>
+    {#if $gameState.roomName}
+      <div class="inline-flex items-center gap-3 bg-gray-50 border-2 border-gray-200 px-4 py-2 rounded-2xl mb-3">
+        {#if $gameState.roomIcon}
+          <img src={$gameState.roomIcon} alt={$gameState.roomName} class="w-10 h-10 rounded-xl" />
+        {/if}
+        <div class="text-left">
+          <p class="font-bold text-gray-800 text-base leading-tight">{$gameState.roomName}</p>
+          {#if $gameState.roomGroup}
+            <p class="text-xs text-gray-500">{$gameState.roomGroup}</p>
+          {/if}
+        </div>
+      </div>
+    {/if}
+    <h1 class="text-4xl font-bold text-primary mb-2">BEKLEME MASASI</h1>
     <p class="text-gray-500">Diğer oyuncuları bekleyin...</p>
   </div>
 
@@ -135,6 +153,18 @@
           </div>
 
           {#if editSection && editSection.has_themes}
+            <button
+              type="button"
+              on:click={() => editTheme = ALL_THEMES_SLUG}
+              class="w-full px-3 py-2 rounded-lg border-2 text-left text-xs font-bold transition-all flex justify-between items-center gap-2 {
+                editTheme === ALL_THEMES_SLUG
+                  ? 'border-lime-500 bg-lime-500 text-white'
+                  : 'border-lime-300 bg-lime-50 text-gray-800 hover:border-lime-500'
+              }"
+            >
+              <span>🎲 {ALL_THEMES_LABEL}</span>
+              <span class="opacity-80">({editSection.active_questions})</span>
+            </button>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {#each editSection.themes as th}
                 <button

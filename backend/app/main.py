@@ -7,7 +7,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 from .database import get_db, init_db
-from .models import Question, Theme, GameStats, QuestionStats, User, UserStats
+from .models import Question, Theme, GameStats, QuestionStats, User, UserStats, UserSeenQuestion
 from .curriculum import (
     get_curriculum,
     validate_grade_and_theme,
@@ -19,9 +19,9 @@ from .websocket import socket_app
 
 # FastAPI uygulaması
 app = FastAPI(
-    title="Tarihöz API",
+    title="TarihTöz API",
     description="Tarih ve Sosyal Bilgiler eğitici multiplayer bilgi oyunu",
-    version="2.0.0"
+    version="2.1.0"
 )
 
 # CORS ayarları
@@ -94,8 +94,8 @@ class GameStatsResponse(BaseModel):
 async def root():
     """Ana endpoint"""
     return {
-        "message": "Tarihöz API'ye hoş geldiniz!",
-        "version": "2.0.0",
+        "message": "TarihTöz API'ye hoş geldiniz!",
+        "version": "2.1.0",
         "endpoints": {
             "health": "/health",
             "curriculum": "/api/curriculum",
@@ -108,7 +108,7 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Sağlık kontrolü"""
-    return {"status": "healthy", "service": "tarihoz"}
+    return {"status": "healthy", "service": "tarihtoz"}
 
 
 @app.get("/api/curriculum")
@@ -306,6 +306,7 @@ async def delete_theme(theme_id: int, db: Session = Depends(get_db)):
     )
     q_ids = [row[0] for row in theme_questions]
     if q_ids:
+        db.query(UserSeenQuestion).filter(UserSeenQuestion.question_id.in_(q_ids)).delete(synchronize_session=False)
         db.query(QuestionStats).filter(QuestionStats.question_id.in_(q_ids)).delete(synchronize_session=False)
         db.query(Question).filter(Question.id.in_(q_ids)).delete(synchronize_session=False)
 
@@ -516,7 +517,10 @@ async def delete_question(question_id: int, db: Session = Depends(get_db)):
     if not db_question:
         raise HTTPException(status_code=404, detail="Soru bulunamadı")
 
-    # İlişkili istatistikleri sil (FK kısıtı)
+    # İlişkili istatistik ve görülme kayıtlarını sil (FK kısıtı)
+    db.query(UserSeenQuestion).filter(
+        UserSeenQuestion.question_id == question_id
+    ).delete()
     db.query(QuestionStats).filter(
         QuestionStats.question_id == question_id
     ).delete()
@@ -595,6 +599,51 @@ async def get_users(db: Session = Depends(get_db)):
     return result
 
 
+@app.delete("/api/users/{user_id}")
+async def delete_user(user_id: int, db: Session = Depends(get_db)):
+    """Tek bir kullanıcıyı ve puan/istatistik/görülen soru geçmişini kalıcı olarak sil"""
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
+
+    db.query(UserSeenQuestion).filter(UserSeenQuestion.user_id == user_id).delete()
+    db.query(UserStats).filter(UserStats.user_id == user_id).delete()
+    db.delete(user)
+    db.commit()
+
+    # Aktif socket eşleşmesi varsa temizle
+    from .websocket import socket_users
+    for sid in [s for s, uid in socket_users.items() if uid == user_id]:
+        del socket_users[sid]
+
+    return {"message": "Kullanıcı kalıcı olarak silindi", "user_id": user_id}
+
+
+@app.delete("/api/users")
+async def delete_all_users(db: Session = Depends(get_db)):
+    """Tüm kullanıcıları, puan/istatistiklerini ve liderlik tablosunu sıfırla (sorulara dokunulmaz)"""
+    deleted_count = db.query(User).count()
+    db.query(UserSeenQuestion).delete()
+    db.query(UserStats).delete()
+    db.query(User).delete()
+
+    stats = db.query(GameStats).first()
+    if stats:
+        stats.total_players = 0
+        stats.total_sessions = 0
+        stats.completed_sessions = 0
+        stats.total_questions_answered = 0
+        stats.total_correct_answers = 0
+        stats.total_wrong_answers = 0
+
+    db.commit()
+
+    from .websocket import socket_users
+    socket_users.clear()
+
+    return {"message": f"{deleted_count} kullanıcı ve tüm liderlik istatistikleri silindi", "deleted_count": deleted_count}
+
+
 # Socket.IO'yu FastAPI'ye mount et
 app.mount("/socket.io", socket_app)
 
@@ -613,7 +662,7 @@ async def get_stats(db: Session = Depends(get_db)):
 
 @app.on_event("startup")
 async def startup_event():
-    print("Tarihoz sunucusu baslatiliyor...")
+    print("TarihToz sunucusu baslatiliyor...")
     init_db()
     from .database import SessionLocal
     db = SessionLocal()

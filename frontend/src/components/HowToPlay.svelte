@@ -9,7 +9,7 @@
     <!-- Header -->
     <div class="sticky top-0 bg-gradient-to-r from-cyan-500 to-lime-500 text-white p-6 rounded-t-2xl">
       <div class="flex justify-between items-center">
-        <h2 class="text-3xl font-bold">Tarihöz Nasıl Oynanır?</h2>
+        <h2 class="text-3xl font-bold">TarihTöz Nasıl Oynanır?</h2>
         <button
           on:click={onClose}
           class="text-white hover:text-gray-200 text-3xl font-bold w-10 h-10 flex items-center justify-center"
@@ -29,7 +29,7 @@
         <div class="flex-1">
           <h3 class="text-xl font-bold text-gray-800 mb-2">Sınıf ve Tema Seçin</h3>
           <p class="text-gray-600 text-sm">
-            Giriş ekranında <strong>5, 6, 7, 8. Sınıf</strong> bölümlerinden birini ve o sınıfa ait bir temayı seçin ya da
+            Giriş ekranında <strong>5, 6, 7, 8. Sınıf</strong> bölümlerinden birini ve o sınıfa ait bir temayı (veya <strong>Tüm Temalar (Karışık)</strong>) seçin ya da
             <strong>Dünyanın Enleri</strong> bölümüne tema seçmeden doğrudan girin. Oyunda yalnızca seçtiğiniz bölüme ait sorular gelir!
           </p>
         </div>

@@ -3,11 +3,71 @@ import random
 import re
 import time
 import threading
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 
 from .curriculum import get_topic_info
+
+
+def select_non_repeating_questions(
+    questions: List[Dict],
+    player_seen_sets: Dict[str, Set[int]],
+    max_count: int = 10
+) -> Tuple[List[Dict], Dict[str, Set[int]]]:
+    """
+    Select up to `max_count` questions prioritizing:
+      1) Questions unseen by ANY player at the table (seen_count == 0)
+      2) Questions seen by the FEWEST players at the table (seen_count == 1, 2, ...)
+    If a player has already seen all active questions in the pool before selection,
+    their seen set is reset first. If a player has seen all active questions after
+    selection, their seen set is reset to empty so the next cycle starts fresh.
+    """
+    if not questions:
+        return [], {pid: set() for pid in player_seen_sets}
+
+    pool_ids = {q["id"] for q in questions}
+    pool_size = len(pool_ids)
+
+    # Pre-selection cycle check per player
+    effective_seen: Dict[str, Set[int]] = {}
+    for pid, seen_ids in player_seen_sets.items():
+        active_seen = set(seen_ids) & pool_ids
+        if len(active_seen) >= pool_size:
+            active_seen = set()
+        effective_seen[pid] = active_seen
+
+    # Bucket questions by how many players at the table have already seen them
+    buckets: Dict[int, List[Dict]] = {}
+    for q in questions:
+        qid = q["id"]
+        seen_by_count = sum(1 for s in effective_seen.values() if qid in s)
+        buckets.setdefault(seen_by_count, []).append(q)
+
+    target_count = min(max_count, len(questions))
+    chosen: List[Dict] = []
+    for seen_by_count in sorted(buckets.keys()):
+        if len(chosen) >= target_count:
+            break
+        group = list(buckets[seen_by_count])
+        random.shuffle(group)
+        needed = target_count - len(chosen)
+        chosen.extend(group[:needed])
+
+    # Shuffle final chosen list so round order does not reveal seen/unseen status
+    random.shuffle(chosen)
+    chosen_ids = {q["id"] for q in chosen}
+
+    # Update each player's seen set and reset if they have now completed the full pool
+    updated_seen: Dict[str, Set[int]] = {}
+    for pid, active_seen in effective_seen.items():
+        merged = active_seen | chosen_ids
+        if len(merged) >= pool_size:
+            updated_seen[pid] = set()
+        else:
+            updated_seen[pid] = merged
+
+    return chosen, updated_seen
 
 
 def turkish_lower(text: str) -> str:
@@ -110,6 +170,7 @@ class Player:
     final_submitted: bool = False
     submit_time: Optional[float] = None  # Time when submitted fake answer
     vote_time: Optional[float] = None  # Time when voted
+    guest_seen_questions: Dict[str, List[int]] = field(default_factory=dict)  # topic_key -> [question_ids]
 
 
 @dataclass
@@ -131,8 +192,20 @@ class Round:
 class GameRoom:
     """Game room management class"""
 
-    def __init__(self, room_code: str, max_players: int = 4):
+    def __init__(
+        self,
+        room_code: str,
+        max_players: int = 4,
+        name: str = "",
+        description: str = "",
+        group: str = "",
+        icon: str = ""
+    ):
         self.room_code = room_code
+        self.name = name or room_code
+        self.description = description
+        self.group = group
+        self.icon = icon
         self.max_players = max_players
         self.players: Dict[str, Player] = {}
         self.phase = GamePhase.WAITING
@@ -191,13 +264,16 @@ class GameRoom:
                 next_player = next(iter(self.players.values()))
                 next_player.is_host = True
 
-    def start_game(self, questions: List[Dict]) -> bool:
+    def start_game(self, questions: List[Dict], preselected: bool = False) -> bool:
         """Start game using ONLY the provided topic-filtered questions"""
         if len(self.players) < 2 or not questions:
             return False
 
-        count = min(self.default_max_rounds, len(questions))
-        self.questions = random.sample(questions, count)
+        if preselected:
+            self.questions = list(questions[:self.default_max_rounds])
+        else:
+            count = min(self.default_max_rounds, len(questions))
+            self.questions = random.sample(questions, count)
         self.max_rounds = len(self.questions)
         self.rounds = []
         self.final_test_questions = []
@@ -553,6 +629,9 @@ class GameRoom:
         """Convert room info to dict"""
         return {
             'room_code': self.room_code,
+            'room_name': self.name,
+            'room_group': self.group,
+            'room_icon': self.icon,
             'phase': self.phase.value,
             'current_round': self.current_round,
             'max_rounds': self.max_rounds,
@@ -575,24 +654,193 @@ class GameRoom:
 
 
 class GameManager:
-    """Manager for multiple fixed game rooms"""
+    """Manager for 20 fixed TarihTöz game tables"""
 
-    # 8 fixed rooms with historical scientist/scholar names
+    ROOM_GROUPS = ["Bilim ve Kültür", "Devlet Kurucuları", "Millî Mücadele"]
+
     FIXED_ROOMS = [
-        {"code": "ALI_KUSCU", "name": "Ali Kuşçu", "description": "Şerhu'r-risâletil-vazi'yye (Astronomi, matematik ve dil bilimleri üzerine öncü bilgin)"},
-        {"code": "KARAMANOGLU", "name": "Karamanoğlu Mehmed Bey", "description": "Ferman (1277'de Türkçeyi resmî devlet dili ilan eden tarihî ferman)"},
-        {"code": "KASGARLI", "name": "Kâşgarlı Mahmud", "description": "Dîvânu Lugâti't-Türk (Türk dillerinin ilk sözlüğü ve ansiklopedik eseri)"},
-        {"code": "YUSUF_HACIB", "name": "Yusuf Has Hâcib", "description": "Kutadgu Bilig (Türkçe yazılmış ilk siyasetname ve didaktik eser)"},
-        {"code": "YUKNEKI", "name": "Edib Ahmed Yüknekî", "description": "Atebetü'l-Hakayık (Ahlak ve öğüt içerikli didaktik eser)"},
-        {"code": "YUNUS_EMRE", "name": "Yunus Emre", "description": "Dîvân (Anadolu'da halk diliyle yazılan tasavvuf şiirlerinin zirvesi)"},
-        {"code": "YESEVI", "name": "Hoca Ahmed Yesevî", "description": "Dîvân-ı Hikmet (Türk tasavvuf edebiyatının temel eserlerinden)"},
-        {"code": "NEVAYI", "name": "Ali Şîr Nevâyî", "description": "Muhâkemetü'l-Lügateyn (Türkçenin Farsçadan üstünlüğünü savunan karşılaştırmalı dil eseri)"},
+        # Bilim ve Kültür (1-9)
+        {
+            "code": "ALI_KUSCU",
+            "name": "Ali Kuşçu",
+            "group": "Bilim ve Kültür",
+            "icon": "/icons/masalar/ali_kuscu.svg",
+            "max_players": 4,
+            "description": "Astronomi ve matematik bilgini; Fatih döneminde İstanbul'da medrese müderrisliği yapmıştır."
+        },
+        {
+            "code": "KASGARLI_MAHMUD",
+            "name": "Kâşgarlı Mahmud",
+            "group": "Bilim ve Kültür",
+            "icon": "/icons/masalar/kasgarli_mahmud.svg",
+            "max_players": 4,
+            "description": "Türk dillerinin ilk sözlüğü ve ansiklopedisi Dîvânu Lugâti't-Türk'ün yazarıdır."
+        },
+        {
+            "code": "YUSUF_HAS_HACIB",
+            "name": "Yusuf Has Hâcib",
+            "group": "Bilim ve Kültür",
+            "icon": "/icons/masalar/yusuf_has_hacib.svg",
+            "max_players": 4,
+            "description": "Türk-İslam edebiyatının ilk siyasetnamesi Kutadgu Bilig'in yazarıdır."
+        },
+        {
+            "code": "YUNUS_EMRE",
+            "name": "Yunus Emre",
+            "group": "Bilim ve Kültür",
+            "icon": "/icons/masalar/yunus_emre.svg",
+            "max_players": 4,
+            "description": "Anadolu'da sade Türkçe ile sevgi ve hoşgörü şiirleri yazan büyük mutasavvıf şairdir."
+        },
+        {
+            "code": "IBNI_SINA",
+            "name": "İbn-i Sina",
+            "group": "Bilim ve Kültür",
+            "icon": "/icons/masalar/ibni_sina.svg",
+            "max_players": 4,
+            "description": "El-Kanun fi't-Tıb eseriyle tıp ve felsefe tarihine yön veren büyük bilim insanıdır."
+        },
+        {
+            "code": "HAREZMI",
+            "name": "Harezmi",
+            "group": "Bilim ve Kültür",
+            "icon": "/icons/masalar/harezmi.svg",
+            "max_players": 4,
+            "description": "Cebir biliminin kurucusu ve sıfır rakamını matematiğe kazandıran öncü âlimdir."
+        },
+        {
+            "code": "ULUG_BEY",
+            "name": "Uluğ Bey",
+            "group": "Bilim ve Kültür",
+            "icon": "/icons/masalar/ulug_bey.svg",
+            "max_players": 4,
+            "description": "Semerkant Rasathanesi'ni kuran ve Zîc-i Uluğ Bey yıldız kataloğunu hazırlayan astronom hükümdardır."
+        },
+        {
+            "code": "PIRI_REIS",
+            "name": "Piri Reis",
+            "group": "Bilim ve Kültür",
+            "icon": "/icons/masalar/piri_reis.svg",
+            "max_players": 4,
+            "description": "Kitâb-ı Bahriye ve 1513 tarihli dünya haritasıyla tanınan ünlü Osmanlı denizcisi ve haritacısıdır."
+        },
+        {
+            "code": "MIMAR_SINAN",
+            "name": "Mimar Sinan",
+            "group": "Bilim ve Kültür",
+            "icon": "/icons/masalar/mimar_sinan.svg",
+            "max_players": 4,
+            "description": "Süleymaniye ve Selimiye camileri başta olmak üzere yüzlerce şaheser bırakan başmimardır."
+        },
+
+        # Devlet Kurucuları (10-14)
+        {
+            "code": "METE_HAN",
+            "name": "Mete Han",
+            "group": "Devlet Kurucuları",
+            "icon": "/icons/masalar/mete_han.svg",
+            "max_players": 4,
+            "description": "Asya Hun Devleti'ni güçlendiren ve düzenli orduya onlu sistemi getiren büyük Türk hükümdarıdır."
+        },
+        {
+            "code": "BILGE_KAGAN",
+            "name": "Bilge Kağan",
+            "group": "Devlet Kurucuları",
+            "icon": "/icons/masalar/bilge_kagan.svg",
+            "max_players": 4,
+            "description": "II. Köktürk Devleti'nin bilge hükümdarı; Orhun Yazıtları ile Türk milletine seslenmiştir."
+        },
+        {
+            "code": "ALP_ARSLAN",
+            "name": "Alp Arslan",
+            "group": "Devlet Kurucuları",
+            "icon": "/icons/masalar/alp_arslan.svg",
+            "max_players": 4,
+            "description": "1071 Malazgirt Zaferi ile Anadolu'nun kapılarını Türklere açan Büyük Selçuklu Sultanıdır."
+        },
+        {
+            "code": "KARAMANOGLU_MEHMED_BEY",
+            "name": "Karamanoğlu Mehmed Bey",
+            "group": "Devlet Kurucuları",
+            "icon": "/icons/masalar/karamanoglu_mehmed_bey.svg",
+            "max_players": 4,
+            "description": "1277'de yayımladığı fermanla Türkçeyi resmî devlet dili ilan eden devlet adamıdır."
+        },
+        {
+            "code": "FATIH_SULTAN_MEHMED",
+            "name": "Fatih Sultan Mehmed",
+            "group": "Devlet Kurucuları",
+            "icon": "/icons/masalar/fatih_sultan_mehmed.svg",
+            "max_players": 4,
+            "description": "1453'te İstanbul'u fethederek çağ açıp çağ kapatan Osmanlı Padişahıdır."
+        },
+
+        # Millî Mücadele (15-20)
+        {
+            "code": "GAZI_MUSTAFA_KEMAL",
+            "name": "Gazi Mustafa Kemal",
+            "group": "Millî Mücadele",
+            "icon": "/icons/masalar/gazi_mustafa_kemal.svg",
+            "max_players": 4,
+            "description": "Millî Mücadele'nin başkomutanı ve Türkiye Cumhuriyeti'nin kurucusudur."
+        },
+        {
+            "code": "MEHMET_AKIF_ERSOY",
+            "name": "Mehmet Âkif Ersoy",
+            "group": "Millî Mücadele",
+            "icon": "/icons/masalar/mehmet_akif_ersoy.svg",
+            "max_players": 4,
+            "description": "İstiklal Marşı'mızın yazarı, Millî Mücadele'nin vatan şairidir."
+        },
+        {
+            "code": "HALIDE_EDIB_ADIVAR",
+            "name": "Halide Edib Adıvar",
+            "group": "Millî Mücadele",
+            "icon": "/icons/masalar/halide_edib_adivar.svg",
+            "max_players": 4,
+            "description": "Sultanahmet Mitingi ve cephe hizmetleriyle Millî Mücadele'ye öncülük eden yazar ve kahramandır."
+        },
+        {
+            "code": "NENE_HATUN",
+            "name": "Nene Hatun",
+            "group": "Millî Mücadele",
+            "icon": "/icons/masalar/nene_hatun.svg",
+            "max_players": 4,
+            "description": "93 Harbi'nde Erzurum Aziziye Tabyası'nı savunarak Türk kadınının cesaret simgesi olmuştur."
+        },
+        {
+            "code": "SEYIT_ONBASI",
+            "name": "Seyit Onbaşı",
+            "group": "Millî Mücadele",
+            "icon": "/icons/masalar/seyit_onbasi.svg",
+            "max_players": 4,
+            "description": "Çanakkale Savaşı'nda 276 kiloluk top mermisini sırtlayarak Ocean zırhlısını vuran kahramandır."
+        },
+        {
+            "code": "SERIFE_BACI",
+            "name": "Şerife Bacı",
+            "group": "Millî Mücadele",
+            "icon": "/icons/masalar/serife_baci.svg",
+            "max_players": 4,
+            "description": "Kurtuluş Savaşı'nda İnebolu'dan Kastamonu'ya cephane taşırken donarak şehit olan kahraman Türk anasıdır."
+        },
     ]
 
     def __init__(self):
+        self._room_meta: Dict[str, Dict] = {r["code"]: r for r in self.FIXED_ROOMS}
         self.rooms: Dict[str, GameRoom] = {}
         for room_info in self.FIXED_ROOMS:
-            self.rooms[room_info["code"]] = GameRoom(room_info["code"], max_players=4)
+            self.rooms[room_info["code"]] = self._create_room(room_info)
+
+    def _create_room(self, room_info: Dict) -> GameRoom:
+        return GameRoom(
+            room_code=room_info["code"],
+            max_players=room_info.get("max_players", 4),
+            name=room_info["name"],
+            description=room_info["description"],
+            group=room_info["group"],
+            icon=room_info["icon"],
+        )
 
     def get_room(self, room_code: str = None) -> Optional[GameRoom]:
         """Get a specific room by code, or the first room if not specified"""
@@ -601,7 +849,7 @@ class GameManager:
         return self.rooms.get(room_code)
 
     def get_all_rooms(self) -> List[Dict]:
-        """Get all rooms with their status and selected topic"""
+        """Get all 20 tables with their status, group, icon, and selected topic"""
         rooms_status = []
         for room_info in self.FIXED_ROOMS:
             room = self.rooms[room_info["code"]]
@@ -628,6 +876,8 @@ class GameManager:
             rooms_status.append({
                 "room_code": room_info["code"],
                 "name": room_info["name"],
+                "group": room_info["group"],
+                "icon": room_info["icon"],
                 "description": room_info["description"],
                 "players": players_list,
                 "max_players": room.max_players,
@@ -644,11 +894,11 @@ class GameManager:
 
     def reset_room(self, room_code: str):
         """Reset a specific room for new game (clears topic and players)"""
-        if room_code in self.rooms:
-            self.rooms[room_code] = GameRoom(room_code, max_players=4)
+        if room_code in self.rooms and room_code in self._room_meta:
+            self.rooms[room_code] = self._create_room(self._room_meta[room_code])
 
     def reset_room_keep_players(self, room_code: str) -> Optional[GameRoom]:
-        """Reset room but keep the same players, user_ids, colors, host status, and selected topic"""
+        """Reset room but keep the same players, user_ids, guest seen history, colors, host status, and topic"""
         if room_code not in self.rooms:
             return None
 
@@ -658,6 +908,10 @@ class GameManager:
         player_names = {pid: p.name for pid, p in room.players.items()}
         player_colors = {pid: p.color for pid, p in room.players.items()}
         player_user_ids = {pid: p.user_id for pid, p in room.players.items()}
+        player_guest_seen = {
+            pid: {k: list(v) for k, v in p.guest_seen_questions.items()}
+            for pid, p in room.players.items()
+        }
         host_id = next((pid for pid, p in room.players.items() if p.is_host), None)
         saved_grade = room.grade
         saved_theme = room.theme
@@ -672,7 +926,8 @@ class GameManager:
                 name=player_names[pid],
                 is_host=(pid == host_id),
                 color=player_colors[pid],
-                user_id=player_user_ids[pid]
+                user_id=player_user_ids[pid],
+                guest_seen_questions=player_guest_seen[pid],
             )
 
         return room

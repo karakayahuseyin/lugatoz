@@ -3,6 +3,9 @@ import { writable } from 'svelte/store';
 const initialState = {
   phase: 'home', // home, lobby, submitting_fake, voting, showing_results, final_test, game_over
   roomCode: null,
+  roomName: null,
+  roomGroup: null,
+  roomIcon: null,
   playerName: null,
   playerId: null,
   isHost: false,

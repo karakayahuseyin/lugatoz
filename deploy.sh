@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "LügaTöz Production Deployment"
+echo "TarihTöz Production Deployment"
 echo "================================"
 
 # Renk kodları

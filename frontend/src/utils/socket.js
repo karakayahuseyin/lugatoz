@@ -1,4 +1,5 @@
 import { io } from 'socket.io-client';
+import { getGuestSeenQuestions } from './guestSeen';
 
 class SocketManager {
   constructor() {
@@ -35,7 +36,8 @@ class SocketManager {
             player_name: this.lastPlayerName,
             room_code: this.lastRoomCode,
             grade: this.lastGrade,
-            theme: this.lastTheme
+            theme: this.lastTheme,
+            guest_seen_questions: getGuestSeenQuestions()
           });
           this.isReconnecting = false;
         }, 500);

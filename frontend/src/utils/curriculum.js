@@ -1,4 +1,7 @@
-// Tarihöz müfredat yapısı: Sınıflar, Temalar ve Dünyanın Enleri
+// TarihTöz müfredat yapısı: Sınıflar, dinamik Temalar, Tüm Temalar (Karışık) ve Dünyanın Enleri
+
+export const ALL_THEMES_SLUG = '__all__';
+export const ALL_THEMES_LABEL = 'Tüm Temalar (Karışık)';
 
 const COMMON_THEMES_5_6_7 = [
   { id: 'birlikte_yasamak', order: 1, name: 'Birlikte Yaşamak', full_name: '1. Birlikte Yaşamak', active_questions: 0, total_questions: 0 },
@@ -102,6 +105,7 @@ export function formatTopicLabel(sections, gradeId, themeId) {
   const section = getSectionById(sections, gradeId);
   if (!section) return '';
   if (!section.has_themes) return section.name;
+  if (themeId === ALL_THEMES_SLUG) return `${section.name} • ${ALL_THEMES_LABEL}`;
   const theme = getThemeById(sections, gradeId, themeId);
   return theme ? `${section.name} • ${theme.full_name}` : section.name;
 }

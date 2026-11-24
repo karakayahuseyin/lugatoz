@@ -167,3 +167,32 @@ class UserStats(Base):
 
     def __repr__(self):
         return f"<UserStats(user_id={self.user_id}, games={self.total_games_played})>"
+
+
+class UserSeenQuestion(Base):
+    """Tracks which questions a registered user has seen in each section/topic"""
+    __tablename__ = "user_seen_questions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    topic_key = Column(String(160), nullable=False, index=True)
+    question_id = Column(Integer, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False, index=True)
+    seen_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "topic_key", "question_id", name="uq_user_topic_question"),
+    )
+
+    def __repr__(self):
+        return f"<UserSeenQuestion(user_id={self.user_id}, topic='{self.topic_key}', q={self.question_id})>"
+
+
+class SystemMigration(Base):
+    """Records one-time idempotent data migrations"""
+    __tablename__ = "system_migrations"
+
+    key = Column(String(100), primary_key=True)
+    applied_at = Column(DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<SystemMigration(key='{self.key}')>"

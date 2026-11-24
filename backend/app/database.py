@@ -27,7 +27,7 @@ def get_db():
 
 
 def migrate_db():
-    """Mevcut SQLite veritabanına yeni Tarihöz sütunlarını güvenle ekle"""
+    """Mevcut SQLite veritabanına yeni TarihTöz sütunlarını ve tek seferlik geçişleri güvenle uygula"""
     with engine.begin() as conn:
         result = conn.execute(text("PRAGMA table_info(questions)"))
         existing_columns = {row[1] for row in result.fetchall()}
@@ -53,6 +53,32 @@ def migrate_db():
         conn.execute(text(
             "CREATE INDEX IF NOT EXISTS ix_questions_grade_theme ON questions (grade, theme)"
         ))
+
+        # Tek seferlik migrasyon: Eski LügaTöz kullanıcı hesaplarını ve liderlik tablosunu sıfırla
+        # (Sorulara ve temalara KESİNLİKLE dokunulmaz!)
+        migration_key = "reset_users_for_tarihtoz_v1"
+        already_applied = conn.execute(
+            text("SELECT 1 FROM system_migrations WHERE key = :k"),
+            {"k": migration_key}
+        ).fetchone()
+        if not already_applied:
+            conn.execute(text("DELETE FROM user_seen_questions"))
+            conn.execute(text("DELETE FROM user_stats"))
+            conn.execute(text("DELETE FROM users"))
+            conn.execute(text(
+                "UPDATE game_stats SET "
+                "total_players = 0, "
+                "total_sessions = 0, "
+                "completed_sessions = 0, "
+                "total_questions_answered = 0, "
+                "total_correct_answers = 0, "
+                "total_wrong_answers = 0"
+            ))
+            conn.execute(
+                text("INSERT INTO system_migrations (key, applied_at) VALUES (:k, CURRENT_TIMESTAMP)"),
+                {"k": migration_key}
+            )
+            print("Migration: eski kullanici hesaplari ve liderlik tablosu sifirlandi (sorular korundu)")
 
 
 def init_db():
@@ -172,6 +198,6 @@ def init_db():
             ]
             db.add_all(sample_questions)
             db.commit()
-            print(f"{len(sample_questions)} ornek Tarihoz sorusu eklendi")
+            print(f"{len(sample_questions)} ornek TarihToz sorusu eklendi")
     finally:
         db.close()
